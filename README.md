@@ -50,7 +50,11 @@ This platform functions as an AI-powered investment management team, with specia
 
 ### Prerequisites
 1. Install Claude Code CLI
-2. Clone this repository to WSL (Ubuntu recommended)
+2. Clone this repository to WSL (Ubuntu recommended):
+   ```bash
+   git clone https://github.com/hvkshetry/agentic-investment-managment.git
+   cd agentic-investment-managment
+   ```
 3. Set up Python environment with dependencies
 
 ### MCP Server Configuration
