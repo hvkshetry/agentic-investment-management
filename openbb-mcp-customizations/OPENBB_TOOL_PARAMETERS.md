@@ -110,6 +110,41 @@ The following tools have been removed as they are deprecated or redundant:
 - M2SL - M2 money supply
 - BOGMBASE - Monetary base
 
+## Trade Analysis Tools Parameters
+
+### economy_direction_of_trade
+- **provider**: imf (required)
+- **country**: ISO codes or names (e.g., "us", "china", "united_states")
+- **counterpart**: Trading partners (e.g., "world", "eu", "china,mexico")
+- **direction**: "exports", "imports", "balance", or "all"
+- **frequency**: "annual", "quarterly", "monthly"
+- **start_date/end_date**: Date range for analysis
+- Example: Track US-China bilateral trade monthly
+
+### economy_export_destinations
+- **provider**: econdb (required)
+- **country**: ISO code (e.g., "us", "de", "jp")
+- Returns top export partners with percentage shares
+
+### economy_indicators
+- **provider**: imf or econdb
+- **symbol**: 
+  - For IMF: Use presets like "gold_reserves", "fsi_core", "irfcl_top_lines"
+  - For EconDB: Use indicators like "GDP", "CPI", "MAIN"
+- **country**: ISO codes, can be multiple (e.g., "us,china,jp")
+- **frequency**: Data frequency preference
+- For IMF data, supports Financial Soundness Indicators
+
+### economy_country_profile
+- **provider**: econdb (required)
+- **country**: Full name or ISO code (e.g., "united_states" or "us")
+- **latest**: true for current data only, false for full history
+
+### economy_port_volume
+- **provider**: econdb or imf
+- **port_code**: Specific ports (e.g., "rotterdam,singapore")
+- Returns TEU (Twenty-foot Equivalent Unit) volumes and average dwelling times
+
 ## Tips for Optimal Usage
 
 1. Always specify date ranges for the four tools that require them
@@ -117,3 +152,5 @@ The following tools have been removed as they are deprecated or redundant:
 3. For BLS tools, use proper BLS series IDs, not FRED equivalents
 4. When a tool fails with a provider, try alternative providers listed above
 5. For risk premium calculations, use economy_fred_series to get component rates and calculate spreads manually
+6. For trade analysis, use bilateral flows to track specific trade relationships
+7. Monitor port volumes as leading indicators of trade disruptions
