@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+openbb/
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Data files
+*.csv
+*.xlsx
+*.db
+
+# Temporary test files
+test_*.py
+!test_all_fixes.py
+!test_suite.py
+!test_mcp_simplified.py
+
+# Personal settings
+.env
+user_settings.json
+.openbb_platform/
+
+# Documentation drafts
+DRAFT_*.md
+*_BACKUP.md
