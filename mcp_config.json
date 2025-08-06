@@ -1,7 +1,0 @@
-{
-  "transport": "stdio",
-  "args": ["--no-tool-discovery"],
-  "describe_responses": false,
-  "name": "OpenBB MCP Curated",
-  "description": "OpenBB MCP server with curated set of 55 essential financial tools"
-}

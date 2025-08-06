@@ -25,17 +25,24 @@ openbb/
 *.xlsx
 *.db
 
-# Temporary test files
+# Test files
 test_*.py
-!test_all_fixes.py
-!test_suite.py
-!test_mcp_simplified.py
+tests/
 
-# Personal settings
+# Personal settings and configs
 .env
 user_settings.json
 .openbb_platform/
+personal_settings.yaml
+mcp_config.json
+C:\\Users\\*
+"C:\\Users\\*"
 
-# Documentation drafts
+# Development documentation
+MCP_ARCHITECTURE_GUIDE.md
+PROJECT_STATUS.md
 DRAFT_*.md
 *_BACKUP.md
+
+# Data files (keep sample data out of repo)
+sample_portfolio.json
