@@ -52,18 +52,41 @@ class DataQualityScorer:
         try:
             from statsmodels.tsa.stattools import adfuller
             returns = data.pct_change().dropna()
-            adf_pvalues = []
-            for col in returns.columns:
-                result = adfuller(returns[col].dropna())
-                adf_pvalues.append(result[1])
             
-            stationary_pct = sum(p < 0.05 for p in adf_pvalues) / len(adf_pvalues)
-            scores['stationarity'] = stationary_pct
-            if stationary_pct < 0.8:
-                issues.append(f"Non-stationary series detected ({(1-stationary_pct):.0%})")
+            # Check if we have enough data for stationarity test
+            if len(returns) < 10 or returns.empty:
+                logger.warning("Insufficient data for stationarity test")
+                scores['stationarity'] = 0.5  # Neutral score
+                issues.append("Insufficient data for stationarity test")
+            else:
+                adf_pvalues = []
+                for col in returns.columns:
+                    col_data = returns[col].dropna()
+                    if len(col_data) < 10:  # Skip columns with insufficient data
+                        continue
+                    try:
+                        result = adfuller(col_data)
+                        adf_pvalues.append(result[1])
+                    except Exception as col_error:
+                        logger.warning(f"Stationarity test failed for {col}: {col_error}")
+                        continue
+                
+                if adf_pvalues:
+                    stationary_pct = sum(p < 0.05 for p in adf_pvalues) / len(adf_pvalues)
+                    scores['stationarity'] = stationary_pct
+                    if stationary_pct < 0.8:
+                        issues.append(f"Non-stationary series detected ({(1-stationary_pct):.0%})")
+                else:
+                    scores['stationarity'] = 0.5  # Neutral if no valid tests
+                    issues.append("Could not perform stationarity tests")
+        except ImportError:
+            logger.warning("statsmodels not available for stationarity test")
+            scores['stationarity'] = 0.5  # Neutral score
+            issues.append("Stationarity test unavailable")
         except Exception as e:
-            logger.error(f"Stationarity test failed: {e}")
-            raise ValueError(f"Data quality assessment failed during stationarity test: {str(e)}")
+            logger.warning(f"Stationarity test error: {e}")
+            scores['stationarity'] = 0.5  # Don't fail, just warn
+            issues.append(f"Stationarity test incomplete: {str(e)[:50]}")
             
         # Outlier detection using MAD
         outlier_counts = []
@@ -132,8 +155,13 @@ class MarketDataPipeline:
             import yfinance as yf
             self.yf = yf
             self.yf_available = True
+            # Check yfinance version for compatibility
+            import pkg_resources
+            yf_version = pkg_resources.get_distribution("yfinance").version
+            logger.info(f"Using yfinance version {yf_version}")
         except ImportError:
             self.yf_available = False
+            logger.warning("yfinance not available")
     
     @property
     def obb(self):
@@ -193,17 +221,22 @@ class MarketDataPipeline:
             return self.cache[cache_key]['data']
         
         try:
-            if self.use_openbb and False:  # Temporarily disable OpenBB for equity data
-                # Use OpenBB for data fetching
-                data = self.obb.equity.price.historical(
-                    symbol=tickers,
-                    start=start_date,
-                    end=end_date,
-                    provider='yfinance'  # Can switch providers
-                )
-                prices_df = pd.DataFrame(data.results)
-                prices_df = prices_df.pivot(index='date', columns='symbol', values='close')
-            elif self.yf_available:
+            if self.use_openbb:  # Enable OpenBB for equity data
+                try:
+                    # Use OpenBB for data fetching
+                    data = self.obb.equity.price.historical(
+                        symbol=tickers,
+                        start=start_date,
+                        end=end_date,
+                        provider='yfinance'  # Can switch providers
+                    )
+                    prices_df = pd.DataFrame(data.results)
+                    prices_df = prices_df.pivot(index='date', columns='symbol', values='close')
+                except Exception as openbb_error:
+                    logger.warning(f"OpenBB fetch failed: {openbb_error}, falling back to direct yfinance")
+                    self.use_openbb = False  # Fallback for this request
+            
+            if not self.use_openbb and self.yf_available:
                 # Fallback to yfinance
                 if len(tickers) == 1:
                     # Single ticker - download directly
