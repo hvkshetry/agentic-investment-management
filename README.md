@@ -19,25 +19,49 @@ This platform functions as an AI-powered investment management team, with specia
 - **ETF Analyst** - Fund selection, expense analysis, holdings evaluation
 - **Derivatives Analyst** - Options chains, volatility analysis, Greeks
 
+## 🏗️ Integrated Architecture
+
+### Portfolio State Server (Central Hub)
+The **Portfolio State Server** acts as the single source of truth for all portfolio data:
+- **Tax Lot Tracking**: Complete purchase history with cost basis
+- **Multi-Account Support**: Manage multiple brokerage accounts
+- **CSV Import**: Vanguard and UBS statement parsers
+- **Real-time Updates**: Live price updates via yfinance
+- **Unified Data Model**: Consistent data format for all servers
+
+All other servers now integrate with Portfolio State Server for accurate, tax-lot-aware analysis:
+
+```
+Portfolio State Server (Data Hub)
+         ↓
+    ┌────┴────┬────────┬────────────┐
+    ↓         ↓        ↓            ↓
+Risk v4   Portfolio  Tax v3    Tax Optimization
+Server    Opt v4     Server    Server (Oracle)
+```
+
 ## 🛠️ Core Capabilities
 
-### Risk Management
+### Risk Management (Integrated with Portfolio State)
 - **VaR Methods**: Historical, Parametric, Cornish-Fisher
-- **Stress Testing**: 2008 crisis, COVID-19, custom scenarios
+- **Stress Testing**: 2008 crisis, COVID-19, custom scenarios  
 - **Risk Metrics**: Sharpe, Sortino, CVaR, Maximum Drawdown
-- **Correlation Analysis**: Ledoit-Wolf shrinkage for robust estimates
+- **Position-Level Risk**: Individual position risk analysis
+- **Tax-Lot Aware**: Risk calculations consider tax implications
 
-### Portfolio Optimization
-- **Modern Portfolio Theory**: Efficient frontier, Black-Litterman
-- **Risk Parity**: Equal risk contribution, hierarchical risk parity
-- **Advanced Objectives**: 13+ Riskfolio-Lib measures (CVaR, MAD, Ulcer Index)
-- **Constraints**: Long-only, position limits, sector allocation
+### Portfolio Optimization (State-Aware)
+- **Modern Portfolio Theory**: Efficient frontier with actual holdings
+- **Tax-Aware Rebalancing**: Minimize tax impact during rebalancing
+- **Oracle Integration**: Advanced optimization with CBC solver
+- **Advanced Objectives**: 13+ Riskfolio-Lib measures
+- **Constraints**: Long-only, position limits, tax considerations
 
-### Tax Optimization
-- **Federal Calculations**: Complete brackets, AMT, deductions
-- **Investment Taxes**: NIIT (3.8%), capital gains optimization
-- **Entity Support**: Individual, trust, estate calculations
-- **State Taxes**: Massachusetts-specific with 12% STCG
+### Tax Optimization (Oracle-Powered)
+- **Tax Loss Harvesting**: Automated TLH pair identification
+- **Withdrawal Optimization**: Minimize taxes on distributions
+- **Federal/State Calculations**: Complete tax modeling
+- **Trust & Estate Support**: Specialized entity calculations
+- **NIIT & AMT**: Advanced tax scenario modeling
 
 ### Market Data (60+ OpenBB Tools)
 - **Equities**: Fundamentals, ownership, analyst estimates
@@ -64,6 +88,51 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
 ```json
 {
   "mcpServers": {
+    "portfolio-state": {
+      "type": "stdio",
+      "command": "wsl",
+      "args": [
+        "-d", "Ubuntu",
+        "/home/[username]/investing/openbb/bin/python",
+        "/home/[username]/investing/portfolio-state-mcp-server/portfolio_state_server.py"
+      ]
+    },
+    "portfolio-optimization": {
+      "type": "stdio",
+      "command": "wsl",
+      "args": [
+        "-d", "Ubuntu",
+        "/home/[username]/investing/openbb/bin/python",
+        "/home/[username]/investing/portfolio-mcp-server/portfolio_mcp_server_v4.py"
+      ]
+    },
+    "risk-analyzer": {
+      "type": "stdio",
+      "command": "wsl",
+      "args": [
+        "-d", "Ubuntu",
+        "/home/[username]/investing/openbb/bin/python",
+        "/home/[username]/investing/risk-mcp-server/risk_mcp_server_v4.py"
+      ]
+    },
+    "tax-calculator": {
+      "type": "stdio",
+      "command": "wsl",
+      "args": [
+        "-d", "Ubuntu",
+        "/home/[username]/investing/openbb/bin/python",
+        "/home/[username]/investing/tax-mcp-server/tax_mcp_server_v3.py"
+      ]
+    },
+    "tax-optimization": {
+      "type": "stdio",
+      "command": "wsl",
+      "args": [
+        "-d", "Ubuntu",
+        "/home/[username]/investing/openbb/bin/python",
+        "/home/[username]/investing/tax-optimization-mcp-server/tax_optimization_server.py"
+      ]
+    },
     "openbb-curated": {
       "type": "stdio",
       "command": "wsl",
@@ -72,33 +141,6 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
         "/home/[username]/investing/openbb/bin/openbb-mcp",
         "--transport", "stdio",
         "--no-tool-discovery"
-      ]
-    },
-    "tax-server": {
-      "type": "stdio",
-      "command": "wsl",
-      "args": [
-        "-d", "Ubuntu",
-        "/home/[username]/investing/openbb/bin/python",
-        "/home/[username]/investing/tax-mcp-server/tax_mcp_server_v2.py"
-      ]
-    },
-    "portfolio-server": {
-      "type": "stdio",
-      "command": "wsl",
-      "args": [
-        "-d", "Ubuntu",
-        "/home/[username]/investing/openbb/bin/python",
-        "/home/[username]/investing/portfolio-mcp-server/portfolio_mcp_server_v3.py"
-      ]
-    },
-    "risk-server": {
-      "type": "stdio",
-      "command": "wsl",
-      "args": [
-        "-d", "Ubuntu",
-        "/home/[username]/investing/openbb/bin/python",
-        "/home/[username]/investing/risk-mcp-server/risk_mcp_server_v3.py"
       ]
     }
   }
@@ -162,29 +204,53 @@ Create `~/.openbb_platform/user_settings.json`:
 # Activate environment
 source openbb/bin/activate
 
-# Run test suite
+# Run integrated system tests
+python test_integrated_system.py
+
+# Run individual component tests
 python -m pytest test_all_fixes.py -v
 ```
 
-**Test Coverage**: 100% (13/13 tests passing)
+**Integration Test Results**: 71.4% (10/14 tests passing)
+- ✅ Portfolio State Server: 100% (4/4 tests)
+- ✅ Tax Calculations: 100% (3/3 tests)  
+- ✅ Portfolio Optimization: Core functionality working
+- ✅ Risk Analysis: Comprehensive analysis working
+- ✅ Tax Loss Harvesting: Pair identification working
+- ⚠️ Known Issues: Oracle integration, position risk calculations
+
+**Component Test Coverage**: 100% (13/13 tests passing)
 - Portfolio optimization algorithms
 - Risk calculations with real data
 - Tax computation accuracy
 - Market data integration
-- Agent coordination
+- Data pipeline functionality
 
 ## 📁 Project Structure
 
 ```
 investing/
-├── agent-prompts/           # Claude Code agent system prompts
-│   ├── CLAUDE.md           # Main orchestrator
-│   └── sub-agents/         # 9 specialized analysts
-├── risk-mcp-server/        # Risk analysis MCP server
-├── portfolio-mcp-server/   # Portfolio optimization server
-├── tax-mcp-server/         # Tax calculation server
-├── openbb-mcp-customizations/ # OpenBB integration
-└── shared/                 # Common utilities
+├── portfolio-state-mcp-server/  # Central data hub (NEW)
+│   ├── portfolio_state_server.py
+│   ├── parsers/                 # CSV parsers for brokers
+│   └── state/                   # Portfolio state storage
+├── risk-mcp-server/             # Risk analysis (v4 - integrated)
+│   └── risk_mcp_server_v4.py
+├── portfolio-mcp-server/        # Portfolio optimization (v4 - integrated)
+│   └── portfolio_mcp_server_v4.py
+├── tax-mcp-server/              # Tax calculations (v3 - integrated)
+│   └── tax_mcp_server_v3.py
+├── tax-optimization-mcp-server/ # Oracle-powered tax optimization (NEW)
+│   └── tax_optimization_server.py
+├── oracle/                      # Oracle optimization engine
+│   └── src/service/oracle.py
+├── shared/                      # Common utilities
+│   ├── data_pipeline.py
+│   └── confidence_scoring.py
+├── agent-prompts/               # Claude Code agent system prompts
+│   ├── CLAUDE.md               # Main orchestrator
+│   └── sub-agents/             # 9 specialized analysts
+└── test_integrated_system.py   # Integration test suite
 ```
 
 ## 🔒 Security

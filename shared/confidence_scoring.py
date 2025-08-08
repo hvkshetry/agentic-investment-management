@@ -321,6 +321,69 @@ class ConfidenceScorer:
         
         return enhanced
 
+    def score_risk_analysis(self, params: Dict[str, Any]) -> float:
+        """Score confidence in risk analysis"""
+        data_points = params.get('data_points', 0)
+        missing_data = params.get('missing_data', 0)
+        num_assets = params.get('num_assets', 1)
+        lookback = params.get('lookback_periods', 252)
+        
+        # Base score from data adequacy
+        base_score = min(1.0, data_points / (num_assets * 252))
+        
+        # Penalty for missing data
+        missing_penalty = 1.0 - missing_data
+        
+        # Lookback adequacy
+        lookback_score = min(1.0, lookback / 252)
+        
+        return base_score * missing_penalty * lookback_score
+    
+    def score_data_quality(self, params: Dict[str, Any]) -> float:
+        """Score data quality for general use"""
+        missing_pct = params.get('missing_data_pct', 0)
+        lookback = params.get('lookback_days', 252)
+        num_assets = params.get('num_assets', 1)
+        
+        # Base score from lookback adequacy
+        lookback_score = min(1.0, lookback / 252)
+        
+        # Missing data penalty
+        missing_penalty = 1.0 - missing_pct
+        
+        # Asset coverage
+        asset_score = min(1.0, num_assets / 10) if num_assets > 0 else 0.5
+        
+        return lookback_score * missing_penalty * asset_score
+    
+    def score_model_confidence(self, params: Dict[str, Any]) -> float:
+        """Score model confidence"""
+        libraries = params.get('libraries_available', 0)
+        methods = params.get('methods_successful', 0)
+        shrinkage = params.get('shrinkage_used', False)
+        
+        base_score = min(1.0, libraries * 0.5)
+        method_score = min(1.0, methods * 0.5)
+        bonus = 0.1 if shrinkage else 0
+        
+        return min(1.0, base_score + method_score + bonus)
+    
+    def score_tax_analysis(self, params: Dict[str, Any]) -> float:
+        """Score confidence in tax analysis"""
+        num_lots = params.get('num_tax_lots', 0)
+        data_complete = params.get('data_completeness', 0.5)
+        state_included = params.get('state_tax_included', 0.8)
+        tenforty = params.get('tenforty_available', 0.5)
+        
+        # Base score from tax lot coverage
+        base_score = min(1.0, num_lots / 10) if num_lots > 0 else 0.5
+        
+        # Weighted components
+        return (base_score * 0.3 + 
+                data_complete * 0.3 + 
+                state_included * 0.2 + 
+                tenforty * 0.2)
+
 # Singleton for import
 confidence_scorer = ConfidenceScorer()
 

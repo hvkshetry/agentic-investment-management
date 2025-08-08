@@ -576,6 +576,42 @@ class MarketDataPipeline:
         }
         
         return data
+    
+    def prepare_for_risk_analysis(
+        self,
+        tickers: List[str],
+        lookback_days: int = 252
+    ) -> Dict[str, Any]:
+        """
+        Prepare data specifically for risk analysis
+        Similar to prepare_for_optimization but focused on risk metrics
+        
+        Args:
+            tickers: List of assets
+            lookback_days: Historical data period (default 252 trading days = 1 year)
+        
+        Returns:
+            Dictionary with prices, returns, and risk-ready data
+        """
+        # Fetch raw data
+        data = self.fetch_equity_data(
+            tickers=tickers,
+            start_date=(datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+        )
+        
+        # Add benchmark data if not present
+        if 'benchmark_returns' not in data:
+            try:
+                benchmark_data = self.fetch_equity_data(
+                    tickers=['SPY'],  # Use S&P 500 as default benchmark
+                    start_date=(datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+                )
+                data['benchmark_returns'] = benchmark_data['returns']['SPY']
+            except Exception as e:
+                logger.warning(f"Could not fetch benchmark data: {e}")
+                data['benchmark_returns'] = None
+        
+        return data
 
 # Singleton instance for import
 pipeline = MarketDataPipeline()
