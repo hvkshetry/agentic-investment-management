@@ -42,22 +42,29 @@ except ImportError:
     logger.warning("tenforty not available - basic tax calculations only")
 
 async def get_portfolio_state():
-    """Connect to Portfolio State Server and get current portfolio state with tax lots"""
+    """Connect to Portfolio State Server and get current portfolio state with enriched data"""
     try:
-        # Read the portfolio state file directly
-        state_file = "/home/hvksh/investing/portfolio-state-mcp-server/state/portfolio_state.json"
+        # Import and call the Portfolio State Server API instead of reading raw JSON
+        # This gives us calculated fields like unrealized_gain
+        import sys
+        sys.path.append('/home/hvksh/investing/portfolio-state-mcp-server')
+        import portfolio_state_server
         
-        if os.path.exists(state_file):
-            with open(state_file, 'r') as f:
-                state_data = json.load(f)
+        from fastmcp import Client
+        client = Client(portfolio_state_server.mcp)
+        
+        async with client:
+            result = await client.call_tool("get_portfolio_state", {})
             
-            return state_data
-        else:
-            logger.warning("Portfolio state file not found")
-            return None
+            if result.data and result.data.get('confidence', 0) > 0:
+                # Return enriched data with calculated unrealized gains
+                return result.data
+            else:
+                logger.warning("Failed to get portfolio state from server")
+                return None
             
     except Exception as e:
-        logger.error(f"Error reading portfolio state: {e}")
+        logger.error(f"Error getting portfolio state: {e}")
         return None
 
 @server.tool()
@@ -95,40 +102,67 @@ async def calculate_tax_implications_from_state(
                 "confidence": 0.0
             }
         
-        # Process tax lots
-        tax_lots = portfolio_state.get('tax_lots', {})
+        # Use enriched data from Portfolio State Server
+        # This already has calculated unrealized gains - no need to fetch prices again!
+        positions = portfolio_state.get('positions', [])
+        tax_lots_data = portfolio_state.get('tax_lots', [])
         
-        # Calculate current unrealized gains
+        # Build tax_lots dictionary from data
+        tax_lots = {}
+        for lot in tax_lots_data:
+            symbol = lot.get('symbol')
+            if symbol:
+                if symbol not in tax_lots:
+                    tax_lots[symbol] = []
+                tax_lots[symbol].append(lot)
+        
+        # Build a map of current prices from positions (already fetched by Portfolio State Server)
+        current_prices = {}
+        for pos in positions:
+            if isinstance(pos, dict):
+                current_prices[pos.get('symbol')] = pos.get('current_price', 0)
+        
+        # Calculate current unrealized gains from the enriched tax lot data
         long_term_gains = 0
         short_term_gains = 0
         total_unrealized = 0
         harvestable_losses = []
         
-        for symbol, lots in tax_lots.items():
-            for lot in lots:
-                unrealized = lot.get('unrealized_gain', 0)
-                total_unrealized += unrealized
+        for lot in tax_lots_data:
+            symbol = lot.get('symbol')
+            if symbol in ['CASH', 'VMFXX', 'N/A']:
+                continue
+            
+            # Use current price from positions data
+            current_price = current_prices.get(symbol, 0)
+            if current_price <= 0:
+                continue
                 
-                if lot.get('is_long_term', False):
-                    long_term_gains += unrealized if unrealized > 0 else 0
-                    if unrealized < -1000:  # Significant loss
-                        harvestable_losses.append({
-                            "symbol": symbol,
-                            "lot_id": lot['lot_id'],
-                            "loss": abs(unrealized),
-                            "type": "long_term",
-                            "holding_days": lot.get('holding_period_days', 0)
-                        })
-                else:
-                    short_term_gains += unrealized if unrealized > 0 else 0
-                    if unrealized < -1000:  # Significant loss
-                        harvestable_losses.append({
-                            "symbol": symbol,
-                            "lot_id": lot['lot_id'],
-                            "loss": abs(unrealized),
-                            "type": "short_term",
-                            "holding_days": lot.get('holding_period_days', 0)
-                        })
+            # Calculate unrealized gain
+            current_value = lot['quantity'] * current_price
+            unrealized = current_value - lot['cost_basis']
+            total_unrealized += unrealized
+            
+            if lot.get('is_long_term', False):
+                long_term_gains += unrealized if unrealized > 0 else 0
+                if unrealized < -1000:  # Significant loss
+                    harvestable_losses.append({
+                        "symbol": symbol,
+                        "lot_id": lot['lot_id'],
+                        "loss": abs(unrealized),
+                        "type": "long_term",
+                        "holding_days": lot.get('holding_period_days', 0)
+                    })
+            else:
+                short_term_gains += unrealized if unrealized > 0 else 0
+                if unrealized < -1000:  # Significant loss
+                    harvestable_losses.append({
+                        "symbol": symbol,
+                        "lot_id": lot['lot_id'],
+                        "loss": abs(unrealized),
+                        "type": "short_term",
+                        "holding_days": lot.get('holding_period_days', 0)
+                    })
         
         # Initialize result
         result = {
@@ -171,8 +205,11 @@ async def calculate_tax_implications_from_state(
                     )
                     result["simulated_sales"].append(sale_result)
         
-        # Calculate estimated taxes
-        if TENFORTY_AVAILABLE and other_income:
+        # Calculate estimated taxes - FAIL LOUDLY if missing data
+        if not TENFORTY_AVAILABLE:
+            logger.warning("Tax calculation library (tenforty) not available - basic calculations only")
+        
+        if other_income:
             try:
                 # Prepare income data
                 income_data = other_income or {}
@@ -333,7 +370,18 @@ async def optimize_sale_for_taxes(
                 "confidence": 0.0
             }
         
-        tax_lots = portfolio_state.get('tax_lots', {})
+        # Get tax lots and convert to dict format
+        tax_lots_data = portfolio_state.get('tax_lots', [])
+        tax_lots = {}
+        if isinstance(tax_lots_data, list):
+            for lot in tax_lots_data:
+                lot_symbol = lot.get('symbol')
+                if lot_symbol:
+                    if lot_symbol not in tax_lots:
+                        tax_lots[lot_symbol] = []
+                    tax_lots[lot_symbol].append(lot)
+        elif isinstance(tax_lots_data, dict):
+            tax_lots = tax_lots_data
         
         if symbol not in tax_lots:
             return {
@@ -344,12 +392,35 @@ async def optimize_sale_for_taxes(
         
         symbol_lots = tax_lots[symbol]
         
-        # Get current price (use first lot's current price as proxy)
-        current_price = symbol_lots[0].get('current_price', 0) if symbol_lots else 0
+        # Fetch current price dynamically using yfinance
+        import yfinance as yf
+        
+        # Handle special tickers
+        ticker_symbol = symbol
+        if symbol == 'BRKB':
+            ticker_symbol = 'BRK-B'
+        elif symbol == 'BRKA':
+            ticker_symbol = 'BRK-A'
+        
+        try:
+            ticker = yf.Ticker(ticker_symbol)
+            ticker_info = ticker.fast_info
+            current_price = ticker_info.get('lastPrice') or ticker_info.get('regularMarketPrice') or ticker_info.get('price', 0)
+            
+            # If fast_info doesn't work, try history
+            if current_price == 0 or current_price is None:
+                hist = ticker.history(period='1d')
+                if not hist.empty:
+                    current_price = hist['Close'].iloc[-1]
+        except Exception as e:
+            # FAIL LOUDLY - No fallback to purchase prices
+            error_msg = f"Failed to fetch current price for {ticker_symbol}: {e}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         
         if current_price <= 0:
             return {
-                "error": "Unable to determine current price",
+                "error": f"Unable to determine current price for {symbol}",
                 "confidence": 0.0
             }
         
@@ -499,7 +570,18 @@ async def year_end_tax_planning(
                 "confidence": 0.0
             }
         
-        tax_lots = portfolio_state.get('tax_lots', {})
+        # Get tax lots and convert to dict format
+        tax_lots_data = portfolio_state.get('tax_lots', [])
+        tax_lots = {}
+        if isinstance(tax_lots_data, list):
+            for lot in tax_lots_data:
+                lot_symbol = lot.get('symbol')
+                if lot_symbol:
+                    if lot_symbol not in tax_lots:
+                        tax_lots[lot_symbol] = []
+                    tax_lots[lot_symbol].append(lot)
+        elif isinstance(tax_lots_data, dict):
+            tax_lots = tax_lots_data
         
         # Calculate current year realized gains (would need transaction history)
         # For now, use YTD income if provided

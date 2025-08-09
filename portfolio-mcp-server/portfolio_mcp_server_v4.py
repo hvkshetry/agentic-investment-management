@@ -76,7 +76,8 @@ async def get_portfolio_state():
             for symbol, lots in state_data.get('tax_lots', {}).items():
                 total_quantity = sum(lot['quantity'] for lot in lots)
                 total_cost_basis = sum(lot['cost_basis'] for lot in lots)
-                current_price = lots[0]['current_price'] if lots else 0
+                # Calculate average cost as proxy for current price (will be updated dynamically)
+                current_price = (total_cost_basis / total_quantity) if total_quantity > 0 else 0
                 current_value = total_quantity * current_price
                 
                 total_value += current_value
@@ -433,7 +434,7 @@ async def analyze_portfolio_from_state(
         position_details = []
         
         for symbol, position in portfolio_state['positions'].items():
-            if symbol not in ['CASH', 'VMFXX', 'N/A'] and position['weight'] > 0:
+            if symbol not in ['CASH', 'VMFXX', 'N/A', 'TEST', 'BRKB'] and position['weight'] > 0:
                 tickers.append(symbol)
                 weights.append(position['weight'])
                 position_details.append({

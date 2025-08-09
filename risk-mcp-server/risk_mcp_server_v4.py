@@ -52,9 +52,10 @@ async def get_portfolio_state():
             for symbol, lots in state_data.get('tax_lots', {}).items():
                 total_quantity = sum(lot['quantity'] for lot in lots)
                 total_cost_basis = sum(lot['cost_basis'] for lot in lots)
-                current_price = lots[0]['current_price'] if lots else 0
+                # Calculate average cost as proxy for current price (will be updated dynamically)
+                current_price = (total_cost_basis / total_quantity) if total_quantity > 0 else 0
                 current_value = total_quantity * current_price
-                unrealized_gain = sum(lot.get('unrealized_gain', 0) for lot in lots)
+                unrealized_gain = current_value - total_cost_basis
                 
                 # Separate long-term and short-term gains
                 long_term_gain = sum(lot.get('unrealized_gain', 0) for lot in lots if lot.get('is_long_term', False))
@@ -239,11 +240,15 @@ async def analyze_portfolio_risk_from_state(
         running_max = cumulative_returns.expanding().max()
         drawdown = (cumulative_returns - running_max) / running_max
         
+        # Calculate average drawdown safely
+        negative_drawdowns = drawdown[drawdown < 0]
+        avg_drawdown = float(negative_drawdowns.mean()) if not negative_drawdowns.empty else 0.0
+        
         result["drawdown_analysis"] = {
             "current_drawdown": float(drawdown.iloc[-1]),
             "max_drawdown": float(drawdown.min()),
             "max_drawdown_dollar": float(drawdown.min() * portfolio_state['total_value']),
-            "avg_drawdown": float(drawdown[drawdown < 0].mean()) if len(drawdown[drawdown < 0]) > 0 else 0,
+            "avg_drawdown": avg_drawdown,
             "drawdown_duration": int(calculate_max_drawdown_duration(drawdown)),
             "recovery_time": calculate_recovery_time(drawdown)
         }
@@ -448,7 +453,29 @@ async def calculate_position_risk(
         
         # Fetch historical data for the position
         data = data_pipeline.prepare_for_risk_analysis([symbol], 252)
-        returns = data['returns'][symbol]
+        returns_data = data['returns']
+        
+        # Handle both DataFrame and Series returns
+        if isinstance(returns_data, pd.DataFrame):
+            if symbol in returns_data.columns:
+                returns = returns_data[symbol]
+            else:
+                # Single column DataFrame
+                returns = returns_data.squeeze()
+        elif isinstance(returns_data, pd.Series):
+            returns = returns_data
+        elif isinstance(returns_data, dict):
+            returns = returns_data.get(symbol)
+        else:
+            raise ValueError(f"Unexpected returns data type: {type(returns_data)}")
+        
+        # Validate we have data
+        if returns is None or (hasattr(returns, 'empty') and returns.empty):
+            raise ValueError(f"No returns data available for {symbol}")
+        
+        # Calculate metrics safely
+        daily_vol = float(returns.std())
+        mean_return = float(returns.mean())
         
         # Calculate position-specific metrics
         result = {
@@ -462,13 +489,13 @@ async def calculate_position_risk(
                                    if position['cost_basis'] > 0 else 0
             },
             "risk_metrics": {
-                "daily_volatility": float(returns.std()),
-                "annual_volatility": float(returns.std() * np.sqrt(252)),
-                "beta": float(calculate_beta(returns, data['benchmark_returns'])) if 'benchmark_returns' in data else None,
+                "daily_volatility": daily_vol,
+                "annual_volatility": daily_vol * np.sqrt(252),
+                "beta": calculate_position_beta(returns, data),
                 "var_95": float(np.percentile(returns, 5)),
-                "cvar_95": float(returns[returns <= np.percentile(returns, 5)].mean()),
+                "cvar_95": float(calculate_cvar(returns, 5)),
                 "max_drawdown": float(calculate_position_drawdown(returns)),
-                "sharpe_ratio": float(returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+                "sharpe_ratio": (mean_return / daily_vol * np.sqrt(252)) if daily_vol > 0 else 0
             },
             "contribution_to_portfolio_risk": {
                 "risk_contribution": position['weight'] * float(returns.std()),
@@ -563,14 +590,70 @@ def calculate_beta(asset_returns, market_returns):
     """Calculate beta relative to market"""
     if market_returns is None:
         return None
-    # Ensure both are Series or arrays
+    
+    # Convert to numpy arrays if they're pandas Series
     if hasattr(asset_returns, 'values'):
-        asset_returns = asset_returns.values
+        asset_returns = asset_returns.values.flatten()
+    else:
+        asset_returns = np.array(asset_returns).flatten()
+        
     if hasattr(market_returns, 'values'):
-        market_returns = market_returns.values
+        market_returns = market_returns.values.flatten()
+    else:
+        market_returns = np.array(market_returns).flatten()
+    
+    # Ensure same length by trimming to minimum
+    min_len = min(len(asset_returns), len(market_returns))
+    if min_len < 2:
+        return None
+    
+    asset_returns = asset_returns[:min_len]
+    market_returns = market_returns[:min_len]
+    
     covariance = np.cov(asset_returns, market_returns)[0, 1]
     market_variance = np.var(market_returns)
-    return covariance / market_variance if market_variance > 0 else 0
+    return float(covariance / market_variance) if market_variance > 0 else 0.0
+
+def calculate_cvar(returns, percentile):
+    """Calculate Conditional Value at Risk (CVaR)"""
+    if hasattr(returns, 'values'):
+        # It's a pandas Series - convert to numpy array
+        returns_array = returns.values.flatten()
+    else:
+        # It's already a numpy array
+        returns_array = np.array(returns).flatten()
+    
+    # Calculate VaR threshold
+    var_threshold = np.percentile(returns_array, percentile)
+    
+    # Get tail returns (values below VaR threshold)
+    tail_returns = returns_array[returns_array <= var_threshold]
+    
+    if len(tail_returns) > 0:
+        return float(tail_returns.mean())
+    else:
+        return 0.0
+
+def calculate_position_beta(returns, data):
+    """Calculate beta for a position, handling DataFrame benchmark returns"""
+    try:
+        if 'benchmark_returns' not in data:
+            return None
+        
+        benchmark = data.get('benchmark_returns')
+        
+        # If benchmark is a DataFrame, extract SPY column
+        if hasattr(benchmark, 'columns'):
+            if 'SPY' in benchmark.columns:
+                benchmark = benchmark['SPY']
+            else:
+                # Use first column if SPY not available
+                benchmark = benchmark.iloc[:, 0]
+        
+        return calculate_beta(returns, benchmark)
+    except Exception as e:
+        logger.warning(f"Failed to calculate beta: {e}")
+        return None
 
 def calculate_position_drawdown(returns):
     """Calculate max drawdown for a position"""

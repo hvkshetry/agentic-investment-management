@@ -54,7 +54,7 @@ class DataQualityScorer:
             returns = data.pct_change().dropna()
             
             # Check if we have enough data for stationarity test
-            if len(returns) < 10 or returns.empty:
+            if len(returns) < 10 or (hasattr(returns, 'empty') and returns.empty):
                 logger.warning("Insufficient data for stationarity test")
                 scores['stationarity'] = 0.5  # Neutral score
                 issues.append("Insufficient data for stationarity test")
@@ -141,10 +141,24 @@ class MarketDataPipeline:
     Replaces synthetic data with real market data
     """
     
-    def __init__(self, cache_ttl_minutes: int = 15):
+    # Invalid tickers to exclude
+    INVALID_TICKERS = ['TEST', 'DUMMY', 'MOCK', 'SAMPLE', 'EXAMPLE']
+    
+    def __init__(self, cache_ttl_minutes: int = 15, portfolio_state_client=None):
         self.cache = {}
         self.cache_ttl = timedelta(minutes=cache_ttl_minutes)
         self.quality_scorer = DataQualityScorer()
+        self.ticker_cache = {}  # Cache for resolved ticker symbols
+        self.portfolio_state_client = portfolio_state_client  # For unified data access
+        
+        # Import shared cache manager for cross-server caching
+        try:
+            from cache_manager import get_shared_cache
+            self.shared_cache = get_shared_cache(ttl_seconds=cache_ttl_minutes * 60)
+            logger.info("Using shared cache manager for cross-server data sharing")
+        except ImportError:
+            self.shared_cache = None
+            logger.info("Shared cache not available, using local cache only")
         
         # Lazy initialization - OpenBB will be loaded on first use
         self._obb = None
@@ -153,7 +167,9 @@ class MarketDataPipeline:
         # Import yfinance for equity data (OpenBB will be used for treasury rates)
         try:
             import yfinance as yf
+            import re
             self.yf = yf
+            self.re = re
             self.yf_available = True
             # Check yfinance version for compatibility
             import pkg_resources
@@ -189,6 +205,51 @@ class MarketDataPipeline:
             return False
         return datetime.now() - cache_entry['timestamp'] < self.cache_ttl
     
+    def resolve_ticker(self, ticker: str) -> Optional[str]:
+        """
+        Resolve ticker symbol using fuzzy matching to handle format variations.
+        Tries multiple formats to find a working ticker symbol for Yahoo Finance.
+        """
+        # Check cache first
+        if ticker in self.ticker_cache:
+            return self.ticker_cache[ticker]
+        
+        # Skip invalid tickers
+        if ticker.upper() in self.INVALID_TICKERS or ticker in ['CASH', 'VMFXX', 'N/A']:
+            return None
+        
+        if not self.yf_available:
+            # Can't resolve without yfinance
+            return ticker
+        
+        # Common ticker format variations to try
+        variations = [
+            ticker,                          # Original
+            ticker.replace('B', '-B'),       # BRKB -> BRK-B
+            ticker.replace('A', '-A'),       # BRKA -> BRK-A
+            ticker.replace('.', '-'),        # BRK.B -> BRK-B
+            ticker.replace('_', '-'),        # BRK_B -> BRK-B
+            ticker.replace('-', '.'),        # BRK-B -> BRK.B
+            ticker.replace(' ', ''),         # Remove spaces
+            self.re.sub(r'([A-Z]+)([A-Z])$', r'\1-\2', ticker) if self.re else ticker,  # Split last letter
+        ]
+        
+        # Try each variation
+        for variant in variations:
+            try:
+                test_ticker = self.yf.Ticker(variant)
+                hist = test_ticker.history(period='5d')
+                if not hist.empty:
+                    # Found working ticker
+                    logger.info(f"Resolved ticker {ticker} -> {variant}")
+                    self.ticker_cache[ticker] = variant
+                    return variant
+            except Exception:
+                continue
+        
+        logger.warning(f"Could not resolve ticker: {ticker}")
+        return None
+    
     def fetch_equity_data(
         self,
         tickers: List[str],
@@ -214,11 +275,50 @@ class MarketDataPipeline:
         if not start_date:
             start_date = (datetime.now() - timedelta(days=504)).strftime('%Y-%m-%d')  # 2 years
         
-        # Check cache
+        # Check shared cache first if available
+        if self.shared_cache:
+            # Try to get prices from shared cache
+            cached_prices = self.shared_cache.get_prices(tickers)
+            if cached_prices:
+                logger.info(f"Found {len(cached_prices)} prices in shared cache")
+        
+        # Check local cache
         cache_key = self._get_cache_key(tickers, start_date, end_date)
         if cache_key in self.cache and self._is_cache_valid(self.cache[cache_key]):
             logger.info(f"Using cached data for {tickers}")
             return self.cache[cache_key]['data']
+        
+        # Try Portfolio State Server for current prices (if client provided and fetching recent data)
+        portfolio_prices = {}
+        if self.portfolio_state_client and end_date == datetime.now().strftime('%Y-%m-%d'):
+            try:
+                logger.info("Checking Portfolio State Server for current prices...")
+                # Use asyncio to call async method if needed
+                import asyncio
+                async def get_ps_prices():
+                    async with self.portfolio_state_client:
+                        result = await self.portfolio_state_client.call_tool("get_portfolio_state", {})
+                        if result.data and result.data.get('positions'):
+                            prices = {}
+                            for pos in result.data['positions']:
+                                if isinstance(pos, dict) and pos.get('symbol') in tickers:
+                                    prices[pos['symbol']] = pos.get('current_price', 0)
+                            return prices
+                    return {}
+                
+                # Run async function if we're not already in an async context
+                try:
+                    portfolio_prices = asyncio.run(get_ps_prices())
+                    if portfolio_prices:
+                        logger.info(f"Got {len(portfolio_prices)} prices from Portfolio State Server")
+                        # Cache these prices in shared cache
+                        if self.shared_cache:
+                            self.shared_cache.set_prices(portfolio_prices)
+                except RuntimeError:
+                    # Already in async context, just log and continue
+                    logger.debug("Could not fetch from Portfolio State in sync context")
+            except Exception as e:
+                logger.warning(f"Could not fetch prices from Portfolio State: {e}")
         
         try:
             if self.use_openbb:  # Enable OpenBB for equity data
@@ -246,10 +346,36 @@ class MarketDataPipeline:
                         end=end_date,
                         progress=False
                     )
-                    # Check if data has columns (DataFrame) or is a Series
-                    if isinstance(data, pd.DataFrame):
+                    # Check if we got any data
+                    if data is None:
+                        raise ValueError(f"No data available for {tickers[0]} in the specified date range")
+                    elif hasattr(data, 'empty') and data.empty:
+                        raise ValueError(f"No data available for {tickers[0]} in the specified date range")
+                    elif isinstance(data, pd.DataFrame) and data.isna().all().all():
+                        raise ValueError(f"No valid data available for {tickers[0]} (all NaN values)")
+                    
+                    # yfinance returns MultiIndex even for single ticker!
+                    if isinstance(data.columns, pd.MultiIndex):
+                        # Extract 'Adj Close' or 'Close' prices
+                        if 'Adj Close' in data.columns.levels[0]:
+                            prices_df = data['Adj Close']
+                            # For single ticker, this will be a Series, convert to DataFrame
+                            if isinstance(prices_df, pd.Series):
+                                prices_df = prices_df.to_frame(tickers[0])
+                            elif len(prices_df.columns) == 1:
+                                prices_df.columns = tickers
+                        elif 'Close' in data.columns.levels[0]:
+                            prices_df = data['Close']
+                            # For single ticker, this will be a Series, convert to DataFrame
+                            if isinstance(prices_df, pd.Series):
+                                prices_df = prices_df.to_frame(tickers[0])
+                            elif len(prices_df.columns) == 1:
+                                prices_df.columns = tickers
+                        else:
+                            raise ValueError("No price data found in yfinance response")
+                    elif isinstance(data, pd.DataFrame):
+                        # Non-MultiIndex DataFrame (shouldn't happen with yfinance, but handle it)
                         if 'Adj Close' in data.columns:
-                            # Use rename to avoid shape issues
                             prices_df = data[['Adj Close']].rename(columns={'Adj Close': tickers[0]})
                         elif 'Close' in data.columns:
                             prices_df = data[['Close']].rename(columns={'Close': tickers[0]})
@@ -266,6 +392,14 @@ class MarketDataPipeline:
                         end=end_date,
                         progress=False
                     )
+                    # Check if we got any data
+                    if data is None:
+                        raise ValueError(f"No data available for {tickers} in the specified date range")
+                    elif hasattr(data, 'empty') and data.empty:
+                        raise ValueError(f"No data available for {tickers} in the specified date range")
+                    elif isinstance(data, pd.DataFrame) and data.isna().all().all():
+                        raise ValueError(f"No valid data available for {tickers} (all NaN values)")
+                    
                     # yfinance returns MultiIndex columns for multiple tickers
                     if isinstance(data.columns, pd.MultiIndex):
                         # Extract 'Adj Close' or 'Close' prices
@@ -277,7 +411,10 @@ class MarketDataPipeline:
                             raise ValueError("No price data found in yfinance response")
                     else:
                         # Single ticker returned as regular columns
-                        prices_df = data[['Adj Close'] if 'Adj Close' in data else ['Close']]
+                        if 'Adj Close' in data.columns:
+                            prices_df = data[['Adj Close']]
+                        else:
+                            prices_df = data[['Close']]
                         prices_df.columns = tickers
                 
                 # Ensure we have a DataFrame with ticker columns
@@ -315,11 +452,30 @@ class MarketDataPipeline:
                 }
             }
             
-            # Cache the result
+            # Cache the result locally
             self.cache[cache_key] = {
                 'data': result,
                 'timestamp': datetime.now()
             }
+            
+            # Also save current prices to shared cache
+            if self.shared_cache and not (hasattr(prices_df, 'empty') and prices_df.empty):
+                latest_prices = {}
+                for ticker in tickers:
+                    # Check if prices_df is a DataFrame with columns
+                    if isinstance(prices_df, pd.DataFrame) and ticker in prices_df.columns:
+                        latest_price = prices_df[ticker].iloc[-1]
+                        if not pd.isna(latest_price):
+                            latest_prices[ticker] = float(latest_price)
+                    elif isinstance(prices_df, pd.Series) and len(tickers) == 1:
+                        # Single ticker case - prices_df is a Series
+                        latest_price = prices_df.iloc[-1]
+                        if not pd.isna(latest_price):
+                            latest_prices[ticker] = float(latest_price)
+                
+                if latest_prices:
+                    self.shared_cache.set_prices(latest_prices)
+                    logger.info(f"Saved {len(latest_prices)} prices to shared cache")
             
             logger.info(f"Fetched {len(prices_df)} days of data for {tickers}, quality score: {quality_report['overall_score']}")
             

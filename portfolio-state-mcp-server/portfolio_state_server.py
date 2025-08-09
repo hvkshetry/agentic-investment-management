@@ -16,6 +16,9 @@ from enum import Enum
 from dataclasses import dataclass, asdict
 import csv
 import re
+import yfinance as yf
+import time
+import uuid
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,16 +49,13 @@ class AssetType(str, Enum):
 
 @dataclass
 class TaxLot:
-    """Represents a tax lot for tracking cost basis"""
+    """Represents a tax lot with immutable historical data only"""
     lot_id: str
     symbol: str
     quantity: float
     purchase_date: str
     purchase_price: float
     cost_basis: float
-    current_price: float = 0.0
-    current_value: float = 0.0
-    unrealized_gain: float = 0.0
     holding_period_days: int = 0
     is_long_term: bool = False
     asset_type: str = AssetType.EQUITY
@@ -66,23 +66,12 @@ class TaxLot:
         """Convert to dictionary"""
         return asdict(self)
     
-    def calculate_gain(self, current_price: float) -> Dict[str, float]:
-        """Calculate unrealized gain/loss"""
-        self.current_price = current_price
-        self.current_value = self.quantity * current_price
-        self.unrealized_gain = self.current_value - self.cost_basis
-        
-        # Calculate holding period
+    def update_holding_period(self):
+        """Update holding period and long-term status"""
         purchase = datetime.strptime(self.purchase_date, "%Y-%m-%d")
         today = datetime.now()
         self.holding_period_days = (today - purchase).days
         self.is_long_term = self.holding_period_days > 365
-        
-        return {
-            "unrealized_gain": self.unrealized_gain,
-            "unrealized_return": (self.unrealized_gain / self.cost_basis) if self.cost_basis > 0 else 0,
-            "is_long_term": self.is_long_term
-        }
 
 @dataclass
 class Position:
@@ -116,15 +105,26 @@ class Position:
         }
 
 class PortfolioStateManager:
-    """Manages portfolio state with tax lot tracking"""
+    """Manages portfolio state with tax lot tracking and dynamic pricing"""
+    
+    # Invalid tickers/accounts/brokers to exclude
+    INVALID_TICKERS = ['TEST', 'DUMMY', 'MOCK', 'SAMPLE', 'EXAMPLE']
+    INVALID_ACCOUNTS = ['test_account', 'dummy_account', 'mock_account', 'sample_account']
+    INVALID_BROKERS = ['test', 'dummy', 'mock', 'sample']
+    
+    # Removed mutual fund to ETF mapping - we should fail explicitly for unsupported tickers
+    # rather than using proxy ETF prices which are not accurate
+    MUTUAL_FUND_TO_ETF = {}
     
     def __init__(self):
         self.tax_lots: Dict[str, List[TaxLot]] = {}
         self.positions: Dict[str, Position] = {}
         self.accounts: Dict[str, Dict[str, Any]] = {}
-        self.current_prices: Dict[str, float] = {}
         self.state_file = Path("/home/hvksh/investing/portfolio-state-mcp-server/state/portfolio_state.json")
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        self.ticker_cache: Dict[str, str] = {}  # Cache for resolved ticker symbols
+        self.price_cache: Dict[str, tuple[float, datetime]] = {}  # Cache prices with timestamp
+        self.price_cache_ttl = 300  # 5 minutes TTL for price cache
         self.load_state()
     
     def load_state(self):
@@ -141,7 +141,6 @@ class PortfolioStateManager:
                     ]
                 
                 self.accounts = state.get('accounts', {})
-                self.current_prices = state.get('current_prices', {})
                 
                 # Rebuild positions
                 self._rebuild_positions()
@@ -159,7 +158,6 @@ class PortfolioStateManager:
                     for symbol, lots in self.tax_lots.items()
                 },
                 'accounts': self.accounts,
-                'current_prices': self.current_prices,
                 'last_updated': datetime.now().isoformat()
             }
             
@@ -170,8 +168,131 @@ class PortfolioStateManager:
         except Exception as e:
             logger.error(f"Failed to save state: {e}")
     
+    def resolve_ticker(self, ticker: str) -> Optional[str]:
+        """
+        Resolve ticker symbol using fuzzy matching to handle format variations.
+        Tries multiple formats to find a working ticker symbol for Yahoo Finance.
+        """
+        # Check cache first
+        if ticker in self.ticker_cache:
+            return self.ticker_cache[ticker]
+        
+        # Skip invalid tickers
+        if ticker.upper() in self.INVALID_TICKERS or ticker in ['CASH', 'VMFXX', 'N/A']:
+            return None
+        
+        # Special cases that we know need specific formats
+        if ticker == 'BRKB':
+            return 'BRK-B'
+        if ticker == 'BRKA':
+            return 'BRK-A'
+        
+        # Common ticker format variations to try (same as data_pipeline.py)
+        variations = [
+            ticker,                          # Original
+            ticker.replace('B', '-B'),       # BRKB -> BRK-B
+            ticker.replace('A', '-A'),       # BRKA -> BRK-A
+            ticker.replace('.', '-'),        # BRK.B -> BRK-B
+            ticker.replace('_', '-'),        # BRK_B -> BRK-B
+            ticker.replace('-', '.'),        # BRK-B -> BRK.B
+            ticker.replace(' ', ''),         # Remove spaces
+        ]
+        
+        # Try each variation
+        for variant in variations:
+            try:
+                test_ticker = yf.Ticker(variant)
+                hist = test_ticker.history(period='5d')
+                if not hist.empty:
+                    # Found working ticker
+                    logger.info(f"Resolved ticker {ticker} -> {variant}")
+                    self.ticker_cache[ticker] = variant
+                    return variant
+            except Exception:
+                continue
+        
+        logger.warning(f"Could not resolve ticker: {ticker}")
+        return None
+    
+    def get_current_prices(self, symbols: Optional[List[str]] = None) -> Dict[str, float]:
+        """
+        Fetch current prices dynamically from Yahoo Finance with caching.
+        Uses fuzzy matching to handle ticker format variations.
+        Caches prices for 5 minutes to avoid repeated API calls.
+        """
+        if symbols is None:
+            symbols = list(self.tax_lots.keys())
+        
+        prices = {}
+        now = datetime.now()
+        
+        for symbol in symbols:
+            # Skip non-tradeable items
+            if symbol in ['CASH', 'VMFXX', 'N/A'] or symbol.upper() in self.INVALID_TICKERS:
+                continue
+            
+            # Check cache first
+            if symbol in self.price_cache:
+                cached_price, cached_time = self.price_cache[symbol]
+                age_seconds = (now - cached_time).total_seconds()
+                if age_seconds < self.price_cache_ttl:
+                    prices[symbol] = cached_price
+                    logger.debug(f"Using cached price for {symbol}: ${cached_price:.2f} (age: {age_seconds:.0f}s)")
+                    continue
+            
+            # Resolve ticker format
+            yahoo_symbol = self.resolve_ticker(symbol)
+            if not yahoo_symbol:
+                logger.warning(f"Skipping unresolvable ticker: {symbol}")
+                continue
+            
+            try:
+                ticker = yf.Ticker(yahoo_symbol)
+                # Use 5d period for better mutual fund compatibility
+                hist = ticker.history(period='5d')
+                
+                if not hist.empty:
+                    price = float(hist['Close'].iloc[-1])
+                    prices[symbol] = price
+                    # Cache the price
+                    self.price_cache[symbol] = (price, now)
+                    logger.debug(f"Fetched and cached price for {symbol}: ${price:.2f}")
+                else:
+                    # FAIL LOUDLY - No silent fallback to purchase prices
+                    error_msg = f"Failed to fetch current price for {symbol} - no market data available"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+            except ValueError:
+                # Re-raise our explicit errors
+                raise
+            except Exception as e:
+                # FAIL LOUDLY - No silent fallback
+                error_msg = f"Failed to fetch price for {symbol}: {e}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+        
+        return prices
+    
     def add_tax_lot(self, lot: TaxLot):
-        """Add a new tax lot"""
+        """Add a new tax lot with validation"""
+        # Validate ticker
+        if lot.symbol.upper() in self.INVALID_TICKERS:
+            raise ValueError(f"Invalid ticker '{lot.symbol}': Test/mock tickers not allowed")
+        
+        # Validate account
+        if lot.account_id.lower() in self.INVALID_ACCOUNTS:
+            raise ValueError(f"Invalid account '{lot.account_id}': Test accounts not allowed")
+        
+        # Validate broker
+        if lot.broker.lower() in self.INVALID_BROKERS:
+            raise ValueError(f"Invalid broker '{lot.broker}': Test brokers not allowed")
+        
+        # Verify ticker exists in market (skip for cash-like items)
+        if lot.symbol not in ['CASH', 'VMFXX', 'N/A']:
+            resolved_ticker = self.resolve_ticker(lot.symbol)
+            if not resolved_ticker:
+                logger.warning(f"Could not validate ticker {lot.symbol}, proceeding with caution")
+        
         if lot.symbol not in self.tax_lots:
             self.tax_lots[lot.symbol] = []
         self.tax_lots[lot.symbol].append(lot)
@@ -179,26 +300,33 @@ class PortfolioStateManager:
         self.save_state()
     
     def _rebuild_positions(self):
-        """Rebuild aggregated positions from tax lots"""
+        """Rebuild aggregated positions from tax lots with dynamic pricing"""
         self.positions = {}
+        
+        # Get all symbols that need prices
+        symbols_to_price = [s for s in self.tax_lots.keys() 
+                           if s not in ['CASH', 'VMFXX', 'N/A']]
+        
+        # Fetch current prices dynamically
+        current_prices = self.get_current_prices(symbols_to_price)
         
         for symbol, lots in self.tax_lots.items():
             if not lots:
                 continue
             
+            # Update holding periods for all lots
+            for lot in lots:
+                lot.update_holding_period()
+            
             total_quantity = sum(lot.quantity for lot in lots)
             total_cost_basis = sum(lot.cost_basis for lot in lots)
             average_cost = total_cost_basis / total_quantity if total_quantity > 0 else 0
             
-            # Get current price
-            current_price = self.current_prices.get(symbol, lots[0].purchase_price)
+            # Get current price (use fetched price or fallback to average purchase price)
+            current_price = current_prices.get(symbol, average_cost)
             current_value = total_quantity * current_price
             unrealized_gain = current_value - total_cost_basis
             unrealized_return = (unrealized_gain / total_cost_basis) if total_cost_basis > 0 else 0
-            
-            # Update lot gains
-            for lot in lots:
-                lot.calculate_gain(current_price)
             
             self.positions[symbol] = Position(
                 symbol=symbol,
@@ -213,11 +341,10 @@ class PortfolioStateManager:
                 tax_lots=lots
             )
     
-    def update_prices(self, prices: Dict[str, float]):
-        """Update current market prices"""
-        self.current_prices.update(prices)
+    def refresh_prices(self):
+        """Refresh all position values with latest market prices"""
         self._rebuild_positions()
-        self.save_state()
+        # Note: We don't save state here since prices are fetched dynamically
     
     def get_lots_for_sale(self, symbol: str, quantity: float, method: CostBasisMethod) -> List[TaxLot]:
         """Get tax lots for a sale based on cost basis method"""
@@ -403,7 +530,8 @@ async def update_market_prices(
     Returns updated portfolio metrics
     """
     try:
-        portfolio_manager.update_prices(prices)
+        # Since we fetch prices dynamically, just refresh the positions
+        portfolio_manager.refresh_prices()
         
         # Calculate updated metrics
         total_value = sum(pos.current_value for pos in portfolio_manager.positions.values())
@@ -530,12 +658,18 @@ async def get_tax_loss_harvesting_opportunities(
     Returns list of harvesting opportunities with tax savings estimates
     """
     try:
+        # Refresh prices to get current values
+        portfolio_manager.refresh_prices()
+        
         opportunities = []
         today = datetime.now()
         
         for symbol, position in portfolio_manager.positions.items():
             if position.unrealized_gain >= 0:
                 continue  # Skip positions with gains
+            
+            # Get current price for this position
+            current_price = position.current_price
             
             # Check each lot for harvesting potential
             for lot in position.tax_lots:
@@ -546,7 +680,11 @@ async def get_tax_loss_harvesting_opportunities(
                 if days_held < exclude_recent_days:
                     continue
                 
-                if lot.unrealized_gain < -min_loss_threshold:
+                # Calculate unrealized gain for this lot
+                lot_current_value = lot.quantity * current_price
+                lot_unrealized_gain = lot_current_value - lot.cost_basis
+                
+                if lot_unrealized_gain < -min_loss_threshold:
                     is_long_term = days_held > 365
                     
                     opportunities.append({
@@ -555,11 +693,11 @@ async def get_tax_loss_harvesting_opportunities(
                         "quantity": lot.quantity,
                         "purchase_date": lot.purchase_date,
                         "cost_basis": lot.cost_basis,
-                        "current_value": lot.current_value,
-                        "unrealized_loss": -lot.unrealized_gain,
+                        "current_value": lot_current_value,
+                        "unrealized_loss": -lot_unrealized_gain,
                         "days_held": days_held,
                         "is_long_term": is_long_term,
-                        "tax_benefit_estimate": -lot.unrealized_gain * (0.15 if is_long_term else 0.35)
+                        "tax_benefit_estimate": -lot_unrealized_gain * (0.15 if is_long_term else 0.35)
                     })
         
         # Sort by tax benefit
