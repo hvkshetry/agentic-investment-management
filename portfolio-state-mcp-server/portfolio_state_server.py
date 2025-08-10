@@ -19,6 +19,7 @@ import re
 import yfinance as yf
 import time
 import uuid
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -120,7 +121,10 @@ class PortfolioStateManager:
         self.tax_lots: Dict[str, List[TaxLot]] = {}
         self.positions: Dict[str, Position] = {}
         self.accounts: Dict[str, Dict[str, Any]] = {}
-        self.state_file = Path("/home/hvksh/investing/portfolio-state-mcp-server/state/portfolio_state.json")
+        # Use environment variable or relative path
+        state_path = os.environ.get("PORTFOLIO_STATE_PATH",
+                                   os.path.join(os.path.dirname(__file__), "state", "portfolio_state.json"))
+        self.state_file = Path(state_path)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.ticker_cache: Dict[str, str] = {}  # Cache for resolved ticker symbols
         self.price_cache: Dict[str, tuple[float, datetime]] = {}  # Cache prices with timestamp
@@ -530,7 +534,14 @@ async def update_market_prices(
     Returns updated portfolio metrics
     """
     try:
-        # Since we fetch prices dynamically, just refresh the positions
+        # If prices were provided, update the cache first
+        if prices:
+            now = datetime.now()
+            for symbol, price in prices.items():
+                portfolio_manager.price_cache[symbol] = (float(price), now)
+                logger.info(f"Updated cached price for {symbol}: ${price:.2f}")
+        
+        # Now refresh positions using the updated cache
         portfolio_manager.refresh_prices()
         
         # Calculate updated metrics

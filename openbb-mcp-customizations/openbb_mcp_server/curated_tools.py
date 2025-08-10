@@ -1,6 +1,6 @@
 """Curated list of OpenBB tools for MCP server.
 
-This module defines a fixed set of 60 essential tools that provide comprehensive
+This module defines a fixed set of 58 essential tools that provide comprehensive
 financial analysis capabilities while minimizing context consumption.
 
 IMPORTANT PARAMETER GUIDELINES FOR TOOLS:
@@ -24,7 +24,7 @@ REMOVED TOOLS (5 unfixable):
 - derivatives_options_snapshots: Requires paid intrinio API  
 - equity_fundamental_trailing_dividend_yield: Requires paid tiingo API
 
-Updated: 2025-08-06 - Reduced from 65 to 60 tools after testing
+Updated: 2025-08-10 - Reduced from 60 to 58 tools (removed unused index_constituents, index_available)
 """
 
 # Immutable set of curated tools - these are the ONLY tools that will be available
@@ -110,10 +110,8 @@ CURATED_TOOLS = frozenset({
     "etf_countries",  # Geographic exposure analysis
     "etf_equity_exposure",  # Individual stock exposure in ETFs
     
-    # Index Tools (3 tools - with corrected names)
+    # Index Tools (1 tool - removed unused)
     "index_price_historical",
-    "index_constituents",
-    "index_available",  # Corrected from index_market
     
     # Derivatives Tools (2 tools - removed paid-only intrinio tools)
     "derivatives_options_chains",

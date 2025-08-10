@@ -36,8 +36,8 @@ Portfolio State Server (Data Hub)
          ↓
     ┌────┴────┬────────┬────────────┐
     ↓         ↓        ↓            ↓
-Risk v4   Portfolio  Tax v3    Tax Optimization
-Server    Opt v4     Server    Server (Oracle)
+Risk v3   Portfolio  Tax v2    Tax Optimization
+Server    Opt v3     Server    Server (Oracle)
 ```
 
 ## 🛠️ Core Capabilities
@@ -103,7 +103,7 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
       "args": [
         "-d", "Ubuntu",
         "/home/[username]/investing/openbb/bin/python",
-        "/home/[username]/investing/portfolio-mcp-server/portfolio_mcp_server_v4.py"
+        "/home/[username]/investing/portfolio-mcp-server/portfolio_mcp_server_v3.py"
       ]
     },
     "risk-analyzer": {
@@ -112,7 +112,7 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
       "args": [
         "-d", "Ubuntu",
         "/home/[username]/investing/openbb/bin/python",
-        "/home/[username]/investing/risk-mcp-server/risk_mcp_server_v4.py"
+        "/home/[username]/investing/risk-mcp-server/risk_mcp_server_v3.py"
       ]
     },
     "tax-calculator": {
@@ -121,7 +121,7 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
       "args": [
         "-d", "Ubuntu",
         "/home/[username]/investing/openbb/bin/python",
-        "/home/[username]/investing/tax-mcp-server/tax_mcp_server_v3.py"
+        "/home/[username]/investing/tax-mcp-server/tax_mcp_server_v2.py"
       ]
     },
     "tax-optimization": {
@@ -234,12 +234,12 @@ investing/
 │   ├── portfolio_state_server.py
 │   ├── parsers/                 # CSV parsers for brokers
 │   └── state/                   # Portfolio state storage
-├── risk-mcp-server/             # Risk analysis (v4 - integrated)
-│   └── risk_mcp_server_v4.py
-├── portfolio-mcp-server/        # Portfolio optimization (v4 - integrated)
-│   └── portfolio_mcp_server_v4.py
-├── tax-mcp-server/              # Tax calculations (v3 - integrated)
-│   └── tax_mcp_server_v3.py
+├── risk-mcp-server/             # Risk analysis (v3 - integrated)
+│   └── risk_mcp_server_v3.py
+├── portfolio-mcp-server/        # Portfolio optimization (v3 - integrated)
+│   └── portfolio_mcp_server_v3.py
+├── tax-mcp-server/              # Tax calculations (v2 - integrated)
+│   └── tax_mcp_server_v2.py
 ├── tax-optimization-mcp-server/ # Oracle-powered tax optimization (NEW)
 │   └── tax_optimization_server.py
 ├── oracle/                      # Oracle optimization engine

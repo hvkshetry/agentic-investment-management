@@ -52,7 +52,7 @@ class TaxLot:
 
 class Position:
     """Represents an aggregated position across all tax lots"""
-    def __init__(self, symbol: str, tax_lots: List[TaxLot], current_price: Optional[float] = None):
+    def __init__(self, symbol: str, tax_lots: List[TaxLot], current_price: Optional[float] = None, fetch_price: bool = True):
         self.symbol = symbol
         self.tax_lots = tax_lots
         self.data_pipeline = MarketDataPipeline()  # Reuse existing ticker resolution logic
@@ -63,10 +63,13 @@ class Position:
         self.average_cost = self.total_cost_basis / self.total_quantity if self.total_quantity > 0 else 0
         
         # Get current price if not provided
-        if current_price is None:
+        if current_price is None and fetch_price:
             self.current_price = self._fetch_current_price()
-        else:
+        elif current_price is not None:
             self.current_price = current_price
+        else:
+            # Use average cost as fallback when price fetching is disabled
+            self.current_price = self.average_cost
             
         # Calculate current values
         self.current_value = self.total_quantity * self.current_price
@@ -158,18 +161,19 @@ class PortfolioStateClient:
             # Fail loudly - no fallback
             raise ValueError(f"Failed to read Portfolio State from {self.state_file_path}: {e}")
     
-    async def get_positions(self, symbols: Optional[List[str]] = None) -> Dict[str, Position]:
+    async def get_positions(self, symbols: Optional[List[str]] = None, fetch_prices: bool = True) -> Dict[str, Position]:
         """
         Get current positions with aggregated data
         
         Args:
             symbols: Optional list of symbols to filter by
+            fetch_prices: Whether to fetch current prices (can be slow for many positions)
         
         Returns:
             Dictionary mapping symbols to Position objects
         """
         # Check cache
-        if self._is_cache_valid() and self._positions_cache is not None:
+        if self._is_cache_valid() and self._positions_cache is not None and fetch_prices:
             positions = self._positions_cache
         else:
             # Load fresh data
@@ -185,7 +189,7 @@ class PortfolioStateClient:
                     
                 tax_lots = [TaxLot(lot_data) for lot_data in lots_list]
                 if tax_lots:
-                    positions[symbol] = Position(symbol, tax_lots)
+                    positions[symbol] = Position(symbol, tax_lots, fetch_price=fetch_prices)
             
             # Update cache
             self._positions_cache = positions
@@ -225,7 +229,7 @@ class PortfolioStateClient:
         Returns:
             Total current value of all positions
         """
-        positions = await self.get_positions()
+        positions = await self.get_positions(fetch_prices=True)  # Need prices for value
         return sum(pos.current_value for pos in positions.values())
     
     async def get_portfolio_composition(self) -> Dict[str, float]:
@@ -235,7 +239,7 @@ class PortfolioStateClient:
         Returns:
             Dictionary mapping symbols to their portfolio weights
         """
-        positions = await self.get_positions()
+        positions = await self.get_positions(fetch_prices=True)  # Need prices for weights
         total_value = sum(pos.current_value for pos in positions.values())
         
         if total_value == 0:
@@ -253,7 +257,7 @@ class PortfolioStateClient:
         Returns:
             Dictionary with gain/loss information per symbol
         """
-        positions = await self.get_positions()
+        positions = await self.get_positions(fetch_prices=False)  # Can use average cost for gains
         
         gains = {}
         for symbol, pos in positions.items():

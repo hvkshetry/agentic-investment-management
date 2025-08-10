@@ -1,7 +1,7 @@
 ---
 name: market-scanner
 description: Multi-asset market monitoring and news analysis
-tools: mcp__openbb-curated__news_world, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, WebSearch, Write
+tools: mcp__portfolio-state__get_portfolio_state, mcp__openbb-curated__news_world, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, WebSearch, Read, Write
 model: sonnet
 ---
 

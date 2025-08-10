@@ -1,7 +1,7 @@
 ---
 name: portfolio-manager
 description: Portfolio construction and optimization specialist
-tools: mcp__openbb-curated__etf_search, mcp__openbb-curated__etf_holdings, mcp__openbb-curated__etf_sectors, mcp__openbb-curated__etf_countries, mcp__openbb-curated__etf_info, mcp__openbb-curated__etf_price_performance, mcp__openbb-curated__etf_equity_exposure, mcp__openbb-curated__etf_historical, mcp__portfolio-server__optimize_portfolio_advanced, mcp__sequential-thinking__sequentialthinking, Write
+tools: mcp__portfolio-state__get_portfolio_state, mcp__portfolio-optimization__optimize_portfolio_advanced, mcp__openbb-curated__etf_search, mcp__openbb-curated__etf_holdings, mcp__openbb-curated__etf_sectors, mcp__openbb-curated__etf_countries, mcp__openbb-curated__etf_info, mcp__openbb-curated__etf_price_performance, mcp__openbb-curated__etf_equity_exposure, mcp__openbb-curated__etf_historical, mcp__sequential-thinking__sequentialthinking, Read, Write
 model: sonnet
 ---
 

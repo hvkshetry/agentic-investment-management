@@ -547,20 +547,17 @@ class MarketDataPipeline:
                     end_date = datetime.now()
                     start_date = end_date - timedelta(days=30)  # Get last month's data
                     
-                    # Try FRED provider first
+                    # Try Federal Reserve provider (the correct name, not 'fred')
                     try:
                         treasury_data = self.obb.fixedincome.government.treasury_rates(
                             start_date=start_date.strftime('%Y-%m-%d'),
                             end_date=end_date.strftime('%Y-%m-%d'),
-                            provider='fred'
+                            provider='federal_reserve'
                         )
-                    except Exception as fred_error:
-                        logger.warning(f"FRED treasury rates failed: {fred_error}, trying FMP")
-                        treasury_data = self.obb.fixedincome.government.treasury_rates(
-                            start_date=start_date.strftime('%Y-%m-%d'),
-                            end_date=end_date.strftime('%Y-%m-%d'),
-                            provider='fmp'
-                        )
+                    except Exception as fed_error:
+                        # NO FALLBACK - fail loudly if Federal Reserve data unavailable
+                        logger.error(f"Federal Reserve treasury rates failed: {fed_error}")
+                        raise ValueError(f"Unable to fetch treasury rates from Federal Reserve: {fed_error}")
                     
                     if treasury_data and hasattr(treasury_data, 'results') and treasury_data.results:
                         # Get the latest treasury rates
@@ -612,66 +609,9 @@ class MarketDataPipeline:
                         raise ValueError(f"No treasury rates data returned from OpenBB")
                         
                 except Exception as obb_error:
-                    logger.warning(f"OpenBB yield curve fetch failed: {obb_error}, trying SOFR/EFFR")
-                    # Try alternative: use SOFR or EFFR as risk-free proxy
-                    try:
-                        # Get date range for API calls
-                        end_date = datetime.now()
-                        start_date = end_date - timedelta(days=7)  # Get last week's data
-                        
-                        # Try SOFR first (Secured Overnight Financing Rate)
-                        sofr_data = self.obb.fixedincome.rate.sofr(
-                            start_date=start_date.strftime('%Y-%m-%d'),
-                            end_date=end_date.strftime('%Y-%m-%d'),
-                            provider='fred'
-                        )
-                        if sofr_data and hasattr(sofr_data, 'results') and sofr_data.results:
-                            latest_sofr = sofr_data.results[-1]
-                            base_rate = latest_sofr.rate  # Already in decimal format
-                            
-                            # Add term premium for longer maturities
-                            term_premiums = {
-                                '3m': 0.0,
-                                '6m': 0.001,
-                                '1y': 0.002,
-                                '2y': 0.003,
-                                '5y': 0.005,
-                                '10y': 0.008,
-                                '30y': 0.012
-                            }
-                            premium = term_premiums.get(maturity, 0.008)
-                            rate = base_rate + premium
-                            logger.info(f"Using SOFR + term premium for {maturity}: {rate:.4f} (base SOFR: {base_rate:.4f})")
-                        else:
-                            # Try EFFR (Effective Federal Funds Rate)
-                            effr_data = self.obb.fixedincome.rate.effr(
-                                start_date=start_date.strftime('%Y-%m-%d'),
-                                end_date=end_date.strftime('%Y-%m-%d'),
-                                provider='fred'
-                            )
-                            if effr_data and hasattr(effr_data, 'results') and effr_data.results:
-                                latest_effr = effr_data.results[-1]
-                                base_rate = latest_effr.rate
-                                
-                                # Add term premium
-                                term_premiums = {
-                                    '3m': 0.0,
-                                    '6m': 0.001,
-                                    '1y': 0.002,
-                                    '2y': 0.003,
-                                    '5y': 0.005,
-                                    '10y': 0.008,
-                                    '30y': 0.012
-                                }
-                                premium = term_premiums.get(maturity, 0.008)
-                                rate = base_rate + premium
-                                logger.info(f"Using EFFR + term premium for {maturity}: {rate:.4f} (base EFFR: {base_rate:.4f})")
-                            else:
-                                # No real data available - must fail explicitly
-                                raise ValueError(f"Unable to fetch any risk-free rate data from OpenBB")
-                    except Exception as fallback_error:
-                        logger.error(f"All risk-free rate sources failed: {fallback_error}")
-                        raise ValueError(f"Unable to fetch risk-free rate for {maturity} from any source: {fallback_error}")
+                    logger.error(f"OpenBB yield curve fetch failed: {obb_error}")
+                    # NO SILENT FALLBACKS - fail loudly as required
+                    raise ValueError(f"Failed to fetch risk-free rate from OpenBB: {obb_error}")
                         
             else:
                 # No OpenBB available - must fail explicitly (no fallback allowed)

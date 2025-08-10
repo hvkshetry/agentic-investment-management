@@ -109,7 +109,7 @@ async def calculate_comprehensive_tax(
                 
                 # Get tax lots
                 tax_lots = await portfolio_state_client.get_tax_lots()
-                positions = await portfolio_state_client.get_positions()
+                positions = await portfolio_state_client.get_positions(fetch_prices=False)  # Don't fetch prices for 55 positions
                 
                 if not tax_lots:
                     raise ValueError("No tax lots found in Portfolio State")

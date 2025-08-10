@@ -94,9 +94,6 @@ class VanguardParser(BaseBrokerParser):
                             purchase_date=purchase_date,
                             purchase_price=purchase_price,
                             cost_basis=cost_basis,
-                            current_price=share_price,
-                            current_value=total_value,
-                            unrealized_gain=0,  # No gain since we don't have real cost basis
                             asset_type=asset_type,
                             account_id=vanguard_account,
                             broker="vanguard"

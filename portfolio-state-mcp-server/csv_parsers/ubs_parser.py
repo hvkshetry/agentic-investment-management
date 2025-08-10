@@ -139,7 +139,7 @@ class UBSParser(BaseBrokerParser):
                     # Determine asset type
                     asset_type = self.determine_asset_type(symbol, description)
                     
-                    # Create synthetic tax lot
+                    # Create synthetic tax lot with only valid TaxLot fields
                     lot = TaxLot(
                         lot_id=f"UBS_{account_code}_{symbol}_{idx}",
                         symbol=symbol,
@@ -147,16 +147,13 @@ class UBSParser(BaseBrokerParser):
                         purchase_date=purchase_date,
                         purchase_price=purchase_price,
                         cost_basis=cost_basis,
-                        current_price=current_price,
-                        current_value=current_value,
-                        unrealized_gain=unrealized_gain,
                         asset_type=asset_type,
                         account_id=account_code,
                         broker="ubs"
                     )
                     
-                    # Calculate holding period
-                    lot.calculate_gain(current_price)
+                    # Update holding period (this method exists on TaxLot)
+                    lot.update_holding_period()
                     
                     tax_lots.append(lot)
                     logger.info(f"Parsed UBS lot: {symbol} - {quantity} shares, unrealized: ${unrealized_gain:.2f}")

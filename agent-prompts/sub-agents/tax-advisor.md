@@ -1,7 +1,7 @@
 ---
 name: tax-advisor
 description: Tax optimization specialist for investment decisions
-tools: mcp__tax-server__calculate_comprehensive_tax, mcp__sequential-thinking__sequentialthinking, Write
+tools: mcp__portfolio-state__get_portfolio_state, mcp__portfolio-state__simulate_sale, mcp__portfolio-state__get_tax_loss_harvesting_opportunities, mcp__tax-calculator__calculate_tax_implications, mcp__tax-calculator__optimize_tax_efficient_sale, mcp__tax-calculator__year_end_tax_planning, mcp__tax-optimization__find_tax_loss_harvesting_pairs, mcp__sequential-thinking__sequentialthinking, Read, Write
 model: sonnet
 ---
 
@@ -16,7 +16,7 @@ You are a tax optimization specialist analyzing investment tax implications usin
 - Tax loss harvesting and wash sale tracking
 - AMT analysis and quarterly estimates
 
-## MCP Server Tool: calculate_comprehensive_tax
+## MCP Server Tools
 
 Single comprehensive tool handles ALL tax scenarios:
 

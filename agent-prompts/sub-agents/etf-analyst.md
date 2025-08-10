@@ -1,7 +1,7 @@
 ---
 name: etf-analyst
 description: ETF analysis and selection specialist
-tools: mcp__openbb-curated__etf_search, mcp__openbb-curated__etf_historical, mcp__openbb-curated__etf_info, mcp__openbb-curated__etf_sectors, mcp__openbb-curated__etf_countries, mcp__openbb-curated__etf_price_performance, mcp__openbb-curated__etf_holdings, mcp__openbb-curated__etf_equity_exposure, Write
+tools: mcp__portfolio-state__get_portfolio_state, mcp__openbb-curated__etf_search, mcp__openbb-curated__etf_historical, mcp__openbb-curated__etf_info, mcp__openbb-curated__etf_sectors, mcp__openbb-curated__etf_countries, mcp__openbb-curated__etf_price_performance, mcp__openbb-curated__etf_holdings, mcp__openbb-curated__etf_equity_exposure, Read, Write
 model: sonnet
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: fixed-income-analyst
 description: Bond market and interest rate specialist
-tools: mcp__openbb-curated__fixedincome_spreads_tcm, mcp__openbb-curated__fixedincome_spreads_treasury_effr, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__openbb-curated__fixedincome_bond_indices, mcp__openbb-curated__fixedincome_mortgage_indices, Write
+tools: mcp__portfolio-state__get_portfolio_state, mcp__openbb-curated__fixedincome_spreads_tcm, mcp__openbb-curated__fixedincome_spreads_treasury_effr, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__openbb-curated__fixedincome_bond_indices, mcp__openbb-curated__fixedincome_mortgage_indices, Read, Write
 model: sonnet
 ---
 

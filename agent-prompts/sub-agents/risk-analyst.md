@@ -1,7 +1,7 @@
 ---
 name: risk-analyst
 description: Risk measurement and hedging strategy specialist
-tools: mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__risk-server__analyze_portfolio_risk, mcp__risk-server__get_risk_free_rate, mcp__sequential-thinking__sequentialthinking, Write
+tools: mcp__portfolio-state__get_portfolio_state, mcp__risk-analyzer__analyze_portfolio_risk_from_state, mcp__risk-analyzer__get_risk_free_rate, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__sequential-thinking__sequentialthinking, Read, Write
 model: sonnet
 ---
 

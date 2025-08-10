@@ -1,0 +1,27 @@
+{
+  "portfolio_state": {
+    "get_state": "PASSED",
+    "update_prices": "PASSED",
+    "simulate_sale": "PASSED",
+    "tlh_opportunities": "PASSED"
+  },
+  "portfolio_optimization": {
+    "optimize": "PASSED",
+    "analyze": "FAILED"
+  },
+  "risk_analysis": {
+    "comprehensive": "PASSED",
+    "position_risk": "FAILED"
+  },
+  "tax_calculations": {
+    "implications": "PASSED",
+    "optimize_sale": "PASSED",
+    "year_end": "PASSED"
+  },
+  "tax_optimization": {
+    "oracle_optimize": "FAILED",
+    "tlh_pairs": "PASSED",
+    "withdrawal": "FAILED"
+  },
+  "errors": []
+}
