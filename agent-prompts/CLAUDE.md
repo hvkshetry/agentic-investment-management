@@ -180,6 +180,18 @@ For decisions > 1% of portfolio:
 3. Tax Advisor → optimize for LTCG vs STCG
 4. Risk Analyst → verify risk limits maintained
 
+## VALIDATION GATES (MANDATORY)
+
+Before accepting ANY agent output:
+1. **Tax Loss Validation**: Verify all loss numbers match `portfolio_state` unrealized_gain EXACTLY
+2. **Ticker Validation**: Verify all recommended tickers exist in current holdings
+3. **Asset Classification**: Verify classifications match data provider info (bonds are "bond" not "equity")
+4. **Template Detection**: REJECT any report with template values (75000, 125000, round numbers)
+5. **Tax Rate Validation**: All rates must come from tenforty library, not hardcoded
+6. **Options Income**: Must be <10% annualized yield based on actual chain data
+
+If validation fails: REJECT output and request agent to use MCP tools properly.
+
 ## Final Mandate
 
 1. Use Sequential Thinking for complex analyses

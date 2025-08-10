@@ -10,7 +10,7 @@
         "cost_basis": 184296.8716455142,
         "holding_period_days": 130,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       },
@@ -23,7 +23,7 @@
         "cost_basis": 5267.67,
         "holding_period_days": 730,
         "is_long_term": true,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -38,7 +38,7 @@
         "cost_basis": 78974.42,
         "holding_period_days": 365,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -53,7 +53,7 @@
         "cost_basis": 347066.42789299786,
         "holding_period_days": 136,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -68,7 +68,7 @@
         "cost_basis": 15154.453349953255,
         "holding_period_days": 49,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -83,7 +83,7 @@
         "cost_basis": 10888.26,
         "holding_period_days": 365,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       },
@@ -96,7 +96,7 @@
         "cost_basis": 2527.5,
         "holding_period_days": 730,
         "is_long_term": true,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -111,7 +111,7 @@
         "cost_basis": 33604.01725490196,
         "holding_period_days": 189,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -126,7 +126,7 @@
         "cost_basis": 179697.50673748355,
         "holding_period_days": 130,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -141,7 +141,7 @@
         "cost_basis": 207874.01328917674,
         "holding_period_days": 189,
         "is_long_term": false,
-        "asset_type": "equity",
+        "asset_type": "bond",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -156,7 +156,7 @@
         "cost_basis": 787885.6508150694,
         "holding_period_days": 130,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       },
@@ -169,7 +169,7 @@
         "cost_basis": 39865.479999999996,
         "holding_period_days": 730,
         "is_long_term": true,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -184,7 +184,7 @@
         "cost_basis": 69934.62233435718,
         "holding_period_days": 130,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -199,7 +199,7 @@
         "cost_basis": 214717.71499551306,
         "holding_period_days": 189,
         "is_long_term": false,
-        "asset_type": "equity",
+        "asset_type": "bond",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -214,7 +214,7 @@
         "cost_basis": 193005.8139534884,
         "holding_period_days": 140,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -229,7 +229,7 @@
         "cost_basis": 222371.0449464923,
         "holding_period_days": 140,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -244,7 +244,7 @@
         "cost_basis": 14708.637028231798,
         "holding_period_days": 130,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -259,7 +259,7 @@
         "cost_basis": 370.875,
         "holding_period_days": 134,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -274,7 +274,7 @@
         "cost_basis": 74230.77764224139,
         "holding_period_days": 130,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -289,7 +289,7 @@
         "cost_basis": 834285.7778177365,
         "holding_period_days": 136,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -304,7 +304,7 @@
         "cost_basis": 47441.723498158855,
         "holding_period_days": 136,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -319,7 +319,7 @@
         "cost_basis": 275748.9680875455,
         "holding_period_days": 190,
         "is_long_term": false,
-        "asset_type": "equity",
+        "asset_type": "bond",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -334,7 +334,7 @@
         "cost_basis": 30384.34,
         "holding_period_days": 365,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "30433360",
         "broker": "vanguard"
       }
@@ -660,7 +660,7 @@
         "cost_basis": 40083.67,
         "holding_period_days": 90,
         "is_long_term": false,
-        "asset_type": "equity",
+        "asset_type": "bond",
         "account_id": "NE 55345",
         "broker": "ubs"
       }
@@ -720,7 +720,7 @@
         "cost_basis": 7303.409999999999,
         "holding_period_days": 400,
         "is_long_term": true,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -795,7 +795,7 @@
         "cost_basis": 9733.09,
         "holding_period_days": 270,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -825,7 +825,7 @@
         "cost_basis": 31219.98,
         "holding_period_days": 90,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -840,7 +840,7 @@
         "cost_basis": 4540.800000000001,
         "holding_period_days": 730,
         "is_long_term": true,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -855,7 +855,7 @@
         "cost_basis": 7904.14,
         "holding_period_days": 270,
         "is_long_term": false,
-        "asset_type": "etf",
+        "asset_type": "equity",
         "account_id": "NE 55344",
         "broker": "ubs"
       }
@@ -903,5 +903,5 @@
       "num_lots_imported": 40
     }
   },
-  "last_updated": "2025-08-08T07:41:38.411888"
+  "last_updated": "2025-08-10T13:42:39.759111"
 }

@@ -5,6 +5,7 @@ Provides centralized portfolio state management with tax lot tracking
 """
 
 from fastmcp import FastMCP, Context
+from pydantic import Field
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, date
 from decimal import Decimal
@@ -25,8 +26,11 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("portfolio_state_server")
 
-# Initialize FastMCP server
+# Initialize FastMCP server with proper error handling
 mcp = FastMCP("portfolio-state-server")
+
+# Store original tool decorator for fallback
+_original_tool = mcp.tool
 
 class CostBasisMethod(str, Enum):
     """Cost basis calculation methods"""
@@ -129,10 +133,11 @@ class PortfolioStateManager:
         self.ticker_cache: Dict[str, str] = {}  # Cache for resolved ticker symbols
         self.price_cache: Dict[str, tuple[float, datetime]] = {}  # Cache prices with timestamp
         self.price_cache_ttl = 300  # 5 minutes TTL for price cache
+        self.positions_built = False  # Track if positions have been built
         self.load_state()
     
     def load_state(self):
-        """Load portfolio state from file"""
+        """Load portfolio state from file without fetching prices"""
         if self.state_file.exists():
             try:
                 with open(self.state_file, 'r') as f:
@@ -146,8 +151,10 @@ class PortfolioStateManager:
                 
                 self.accounts = state.get('accounts', {})
                 
-                # Rebuild positions
-                self._rebuild_positions()
+                # LAZY LOADING: Don't rebuild positions on startup
+                # This avoids fetching prices for all 55 tickers during initialization
+                # Positions will be built on first access
+                self.positions_built = False
                 
                 logger.info(f"Loaded portfolio state: {len(self.tax_lots)} symbols, {sum(len(lots) for lots in self.tax_lots.values())} total lots")
             except Exception as e:
@@ -223,13 +230,16 @@ class PortfolioStateManager:
         Fetch current prices dynamically from Yahoo Finance with caching.
         Uses fuzzy matching to handle ticker format variations.
         Caches prices for 5 minutes to avoid repeated API calls.
+        Also updates asset classifications from provider data.
         """
         if symbols is None:
             symbols = list(self.tax_lots.keys())
         
         prices = {}
         now = datetime.now()
+        symbols_to_fetch = []
         
+        # First pass: check cache and identify symbols needing fetch
         for symbol in symbols:
             # Skip non-tradeable items
             if symbol in ['CASH', 'VMFXX', 'N/A'] or symbol.upper() in self.INVALID_TICKERS:
@@ -243,6 +253,16 @@ class PortfolioStateManager:
                     prices[symbol] = cached_price
                     logger.debug(f"Using cached price for {symbol}: ${cached_price:.2f} (age: {age_seconds:.0f}s)")
                     continue
+            
+            # Add to fetch list
+            symbols_to_fetch.append(symbol)
+        
+        # Fetch prices for symbols not in cache
+        logger.info(f"Fetching prices for {len(symbols_to_fetch)} symbols...")
+        for i, symbol in enumerate(symbols_to_fetch):
+            # Log progress for large batches
+            if len(symbols_to_fetch) > 10 and i % 10 == 0:
+                logger.info(f"Progress: {i}/{len(symbols_to_fetch)} symbols fetched")
             
             # Resolve ticker format
             yahoo_symbol = self.resolve_ticker(symbol)
@@ -261,6 +281,9 @@ class PortfolioStateManager:
                     # Cache the price
                     self.price_cache[symbol] = (price, now)
                     logger.debug(f"Fetched and cached price for {symbol}: ${price:.2f}")
+                    
+                    # NEW: Also fetch and update asset classification
+                    self.update_asset_classification(symbol, ticker)
                 else:
                     # FAIL LOUDLY - No silent fallback to purchase prices
                     error_msg = f"Failed to fetch current price for {symbol} - no market data available"
@@ -276,6 +299,82 @@ class PortfolioStateManager:
                 raise ValueError(error_msg)
         
         return prices
+    
+    def update_asset_classification(self, symbol: str, ticker_obj) -> None:
+        """
+        Update asset classification for a symbol based on provider data.
+        Uses yfinance info to determine if this is a bond, equity, etc.
+        """
+        try:
+            # Check asset type cache first
+            if not hasattr(self, 'asset_type_cache'):
+                self.asset_type_cache = {}
+            
+            # Skip if recently cached
+            if symbol in self.asset_type_cache:
+                cached_type = self.asset_type_cache[symbol]
+                # Update all tax lots for this symbol
+                if symbol in self.tax_lots:
+                    for lot in self.tax_lots[symbol]:
+                        if lot.asset_type != cached_type:
+                            lot.asset_type = cached_type
+                            logger.info(f"Updated {symbol} classification to {cached_type}")
+                return
+            
+            # Get ticker info from yfinance
+            info = ticker_obj.info
+            
+            # Determine asset type from yfinance data
+            quote_type = info.get('quoteType', '').upper()
+            category = info.get('category', '').lower()
+            long_name = info.get('longName', '').lower()
+            
+            # Classification logic
+            asset_type = AssetType.EQUITY  # Default
+            
+            # Check for mutual funds first
+            if quote_type == 'MUTUALFUND':
+                # Check category for bond indicators
+                if any(term in category for term in ['bond', 'muni', 'fixed', 'income', 'treasury']):
+                    asset_type = AssetType.BOND
+                elif any(term in long_name for term in ['bond', 'muni', 'fixed income', 'treasury', 'tax-ex', 'tx-ex']):
+                    asset_type = AssetType.BOND
+                else:
+                    asset_type = AssetType.EQUITY
+            
+            # Check for ETFs
+            elif quote_type == 'ETF':
+                # Check category and name for bond indicators
+                if any(term in category for term in ['bond', 'muni', 'fixed', 'income', 'treasury']):
+                    asset_type = AssetType.BOND
+                elif any(term in long_name for term in ['bond', 'muni', 'fixed income', 'treasury', 'tax-ex', 'tx-ex']):
+                    asset_type = AssetType.BOND
+                else:
+                    asset_type = AssetType.EQUITY
+            
+            # Special cases for known bond funds
+            if symbol in ['VWLUX', 'VMLUX', 'VWIUX', 'JAAA', 'VTEAX', 'VCORX']:
+                asset_type = AssetType.BOND
+                logger.info(f"Classified {symbol} as BOND based on known fund list")
+            
+            # Cache the classification
+            self.asset_type_cache[symbol] = asset_type
+            
+            # Update all tax lots for this symbol
+            if symbol in self.tax_lots:
+                updated = False
+                for lot in self.tax_lots[symbol]:
+                    if lot.asset_type != asset_type:
+                        lot.asset_type = asset_type
+                        updated = True
+                
+                if updated:
+                    logger.info(f"Updated {symbol} from {lot.asset_type} to {asset_type} based on provider data")
+                    self.save_state()  # Persist the classification update
+            
+        except Exception as e:
+            logger.warning(f"Could not update asset classification for {symbol}: {e}")
+            # Don't fail the price fetch if classification fails
     
     def add_tax_lot(self, lot: TaxLot):
         """Add a new tax lot with validation"""
@@ -301,7 +400,14 @@ class PortfolioStateManager:
             self.tax_lots[lot.symbol] = []
         self.tax_lots[lot.symbol].append(lot)
         self._rebuild_positions()
+        self.positions_built = True  # Mark as built after rebuild
         self.save_state()
+    
+    def ensure_positions_built(self):
+        """Ensure positions are built (lazy initialization)"""
+        if not self.positions_built:
+            self._rebuild_positions()
+            self.positions_built = True
     
     def _rebuild_positions(self):
         """Rebuild aggregated positions from tax lots with dynamic pricing"""
@@ -348,6 +454,7 @@ class PortfolioStateManager:
     def refresh_prices(self):
         """Refresh all position values with latest market prices"""
         self._rebuild_positions()
+        self.positions_built = True  # Mark as built after rebuild
         # Note: We don't save state here since prices are fetched dynamically
     
     def get_lots_for_sale(self, symbol: str, quantity: float, method: CostBasisMethod) -> List[TaxLot]:
@@ -401,14 +508,24 @@ class PortfolioStateManager:
 portfolio_manager = PortfolioStateManager()
 
 @mcp.tool()
-async def get_portfolio_state(ctx: Context) -> Dict[str, Any]:
+async def get_portfolio_state(
+    ctx: Context,
+    properties: Optional[Union[str, Dict]] = None
+) -> Dict[str, Any]:
     """
     Get complete portfolio state with all positions and tax lots
+    
+    Args:
+        properties: Optional parameters (ignored, for compatibility)
     
     Returns comprehensive portfolio data including positions, tax lots,
     unrealized gains, and asset allocation.
     """
+    # Ignore properties parameter - some MCP clients send empty properties
     try:
+        # Ensure positions are built (lazy loading)
+        portfolio_manager.ensure_positions_built()
+        
         # Calculate summary statistics
         total_value = sum(pos.current_value for pos in portfolio_manager.positions.values())
         total_cost = sum(pos.total_cost_basis for pos in portfolio_manager.positions.values())
@@ -584,6 +701,9 @@ async def simulate_sale(
     Returns tax implications including realized gains breakdown
     """
     try:
+        # Ensure positions are built before simulating
+        portfolio_manager.ensure_positions_built()
+        
         method = CostBasisMethod(cost_basis_method.upper())
         lots_to_sell = portfolio_manager.get_lots_for_sale(symbol, quantity, method)
         
@@ -669,6 +789,9 @@ async def get_tax_loss_harvesting_opportunities(
     Returns list of harvesting opportunities with tax savings estimates
     """
     try:
+        # Ensure positions are built before processing
+        portfolio_manager.ensure_positions_built()
+        
         # Refresh prices to get current values
         portfolio_manager.refresh_prices()
         
@@ -786,6 +909,9 @@ async def record_transaction(
             }
             
         elif transaction_type.lower() == "sell":
+            # Ensure positions are built before processing sale
+            portfolio_manager.ensure_positions_built()
+            
             # Process sale using FIFO by default
             lots_to_sell = portfolio_manager.get_lots_for_sale(
                 symbol, quantity, CostBasisMethod.FIFO

@@ -99,7 +99,7 @@ class GenericParser(BaseBrokerParser):
                         purchase_date=purchase_date,
                         purchase_price=price,
                         cost_basis=cost_basis,
-                        asset_type="equity",  # Default to equity
+                        asset_type="pending",  # Will be updated on next price refresh
                         account_id=account_id,
                         broker="generic"
                     )
