@@ -21,6 +21,7 @@ import yfinance as yf
 import time
 import uuid
 import os
+import shutil
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -122,19 +123,28 @@ class PortfolioStateManager:
     MUTUAL_FUND_TO_ETF = {}
     
     def __init__(self):
-        self.tax_lots: Dict[str, List[TaxLot]] = {}
-        self.positions: Dict[str, Position] = {}
-        self.accounts: Dict[str, Dict[str, Any]] = {}
         # Use environment variable or relative path
         state_path = os.environ.get("PORTFOLIO_STATE_PATH",
                                    os.path.join(os.path.dirname(__file__), "state", "portfolio_state.json"))
         self.state_file = Path(state_path)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Optional: Backup existing state if it exists
+        if self.state_file.exists():
+            backup_file = self.state_file.parent / f"portfolio_state_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            shutil.copy(self.state_file, backup_file)
+            logger.info(f"Backed up existing state to {backup_file}")
+        
+        # Initialize empty state (don't load from file)
+        self.tax_lots: Dict[str, List[TaxLot]] = {}
+        self.positions: Dict[str, Position] = {}
+        self.accounts: Dict[str, Dict[str, Any]] = {}
         self.ticker_cache: Dict[str, str] = {}  # Cache for resolved ticker symbols
         self.price_cache: Dict[str, tuple[float, datetime]] = {}  # Cache prices with timestamp
         self.price_cache_ttl = 300  # 5 minutes TTL for price cache
         self.positions_built = False  # Track if positions have been built
-        self.load_state()
+        
+        logger.info("Portfolio state initialized - starting fresh (not loading existing state)")
     
     def load_state(self):
         """Load portfolio state from file without fetching prices"""

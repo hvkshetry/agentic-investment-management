@@ -37,17 +37,17 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 **Use For:** Daily market updates, breaking news, sentiment shifts
 
 ### 7. **Risk Analyst**
-**MCP Tools:** `mcp__risk-analyzer__analyze_portfolio_risk_from_state`, `mcp__risk-analyzer__get_risk_free_rate`
+**MCP Tools:** `mcp__risk-server__analyze_portfolio_risk`, `mcp__portfolio-state-server__get_portfolio_state`
 **Capabilities:** Multiple VaR methods, Ledoit-Wolf shrinkage, component risk, stress testing
 **Use For:** Portfolio risk assessment, stress testing, risk attribution, hedging design
 
 ### 8. **Portfolio Manager**
-**MCP Tool:** `mcp__portfolio-optimization__optimize_portfolio_advanced` (handles all optimization methods)
+**MCP Tool:** `mcp__portfolio-optimization-server__optimize_portfolio_advanced` (handles all optimization methods)
 **Capabilities:** PyPortfolioOpt, Riskfolio-Lib (13+ risk measures), HRP, constraints
 **Use For:** Asset allocation, portfolio optimization, rebalancing analysis
 
 ### 9. **Tax Advisor**
-**MCP Tools:** `mcp__tax-calculator__calculate_tax_implications`, `mcp__tax-calculator__optimize_tax_efficient_sale`, `mcp__tax-calculator__year_end_tax_planning`
+**MCP Tools:** `mcp__tax-server__calculate_comprehensive_tax`, `mcp__tax-optimization-server__find_tax_loss_harvesting_pairs`, `mcp__portfolio-state-server__simulate_sale`
 **Capabilities:** Federal/state taxes, NIIT, trust tax, MA/CA specifics, loss harvesting
 **Use For:** Tax impact analysis, harvesting strategies, quarterly estimates
 
@@ -79,16 +79,30 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 
 ## Agent Coordination
 
+### Cross-Agent Communication (MANDATORY)
+**Each agent MUST:**
+1. Check if run directory exists: `./runs/<current_timestamp>/`
+2. Read existing artifacts from other agents
+3. Build on previous analyses, don't duplicate work
+4. Write their own artifacts for downstream agents
+
+**Artifact Reading Order:**
+1. Portfolio State → All agents
+2. Macro Context → Risk, Portfolio Manager
+3. Risk Analysis → Portfolio Manager, Tax Advisor
+4. Optimization Results → Tax Advisor
+5. Tax Impact → Final decision
+
 ### Daily Workflow
 **Market Open:**
-- Market Scanner → Overnight developments
-- Risk Analyst → VaR update
-- Macro Analyst → Economic calendar
+- Market Scanner → Overnight developments → `market_scan.json`
+- Risk Analyst → VaR update → `risk_analysis.json`
+- Macro Analyst → Economic calendar → `macro_context.json`
 
 **Market Close:**
-- Portfolio Manager → Performance attribution
-- Risk Analyst → End-of-day metrics
-- Tax Advisor → Realized gains/losses
+- Portfolio Manager → Performance attribution → `performance.json`
+- Risk Analyst → End-of-day metrics → `eod_risk.json`
+- Tax Advisor → Realized gains/losses → `tax_impact.json`
 
 ### Event Triggers
 - VaR breach > 2% → Risk Analyst → Portfolio Manager
@@ -111,10 +125,25 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 
 ## Artifact System (MANDATORY)
 
+### CRITICAL: Parameter Types for MCP Tools
+When calling ANY MCP tool, pass parameters as NATIVE types, NOT JSON strings:
+- ✅ CORRECT: `tickers: ["SPY", "AGG"]` (list)
+- ❌ WRONG: `tickers: "[\"SPY\", \"AGG\"]"` (string)
+- ✅ CORRECT: `weights: [0.6, 0.4]` (list)
+- ❌ WRONG: `weights: "[0.6, 0.4]"` (string)
+- ✅ CORRECT: `config: {"key": "value"}` (dict)
+- ❌ WRONG: `config: "{\"key\": \"value\"}"` (string)
+
 ### Every workflow MUST:
-1. Begin with `mcp__portfolio-state__get_portfolio_state` 
-2. Create artifacts under `./runs/<timestamp>/`
-3. Use standardized JSON envelope:
+1. Begin with `mcp__portfolio-state-server__get_portfolio_state` 
+2. Create run directory: `./runs/<timestamp>/`
+3. Each agent MUST write artifacts using Write tool:
+   - Risk Analyst: `./runs/<timestamp>/risk_analysis.json`
+   - Portfolio Manager: `./runs/<timestamp>/optimization_results.json`
+   - Tax Advisor: `./runs/<timestamp>/tax_impact.json`
+   - Macro Analyst: `./runs/<timestamp>/macro_context.json`
+4. Agents MUST read previous artifacts before analysis
+5. Use standardized JSON envelope:
 
 ```json
 {
@@ -134,6 +163,45 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 - Artifacts: `./runs/<timestamp>/<artifact-id>.json`
 - Human reports: `/reports/[Type]_Analysis_[Topic]_[Date].md`
 - Include: Executive summary, evidence, recommendations
+
+## Portfolio State Server Behavior
+
+### IMPORTANT: Fresh Start on Every Server Initialization
+The Portfolio State Server **always starts with empty state** when initialized.
+
+This means:
+- Every server restart clears ALL portfolio data
+- You MUST re-import CSV data after each server restart
+- This prevents duplicate data accumulation
+- Previous state is automatically backed up (if it exists)
+
+### Standard Import Workflow
+After the portfolio state server starts/restarts:
+
+```python
+# 1. Import first account
+mcp__portfolio-state-server__import_broker_csv(
+    broker="vanguard",
+    csv_content="<paste full CSV content here>",
+    account_id="30433360"
+)
+
+# 2. Import second account  
+mcp__portfolio-state-server__import_broker_csv(
+    broker="ubs",
+    csv_content="<paste full CSV content here>",
+    account_id="NE_55344"
+)
+
+# 3. Verify the complete portfolio state
+mcp__portfolio-state-server__get_portfolio_state()
+```
+
+### Why This Design?
+- **Predictable**: Always know you're starting clean
+- **Simple**: No complex duplicate detection needed
+- **Safe**: Can't accidentally accumulate duplicate positions
+- **Clear**: Server restart = fresh portfolio state
 
 ## CRITICAL: OpenBB Tool Parameters
 
@@ -189,8 +257,10 @@ Before accepting ANY agent output:
 4. **Template Detection**: REJECT any report with template values (75000, 125000, round numbers)
 5. **Tax Rate Validation**: All rates must come from tenforty library, not hardcoded
 6. **Options Income**: Must be <10% annualized yield based on actual chain data
+7. **Tool Names**: Ensure agents use CORRECT MCP tool names (e.g., `mcp__risk-server__` not `mcp__risk-analyzer__`)
+8. **Parameter Types**: OpenBB numeric parameters must be integers not strings (limit: 50 not "50")
 
-If validation fails: REJECT output and request agent to use MCP tools properly.
+If validation fails: REJECT output and request agent to use MCP tools properly with correct names and types.
 
 ## Final Mandate
 
