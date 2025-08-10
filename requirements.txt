@@ -10,7 +10,7 @@ fastmcp>=0.1.0                # MCP server framework
 # Market Data & Financial Libraries
 # =============================================================================
 openbb>=4.0.0                 # Comprehensive market data platform
-yfinance==0.2.58              # Yahoo Finance data (pinned for OpenBB compatibility)
+yfinance>=0.2.40              # Yahoo Finance data
 pandas>=2.0.0                 # Data manipulation
 numpy>=1.24.0                 # Numerical computing
 
@@ -52,6 +52,7 @@ hypothesis>=6.90.0            # Property-based testing
 # =============================================================================
 asyncio                       # Built-in, but listing for clarity
 aiohttp>=3.9.0                # Async HTTP client/server
+httpx>=0.25.0                 # Modern async HTTP client (used by FastMCP)
 
 # =============================================================================
 # Data Validation

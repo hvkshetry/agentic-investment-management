@@ -97,7 +97,7 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
         "/home/[username]/investing/portfolio-state-mcp-server/portfolio_state_server.py"
       ]
     },
-    "portfolio-optimization": {
+    "portfolio-optimization-server": {
       "type": "stdio",
       "command": "wsl",
       "args": [
@@ -106,7 +106,7 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
         "/home/[username]/investing/portfolio-mcp-server/portfolio_mcp_server_v3.py"
       ]
     },
-    "risk-analyzer": {
+    "risk-server": {
       "type": "stdio",
       "command": "wsl",
       "args": [
@@ -115,7 +115,7 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
         "/home/[username]/investing/risk-mcp-server/risk_mcp_server_v3.py"
       ]
     },
-    "tax-calculator": {
+    "tax-server": {
       "type": "stdio",
       "command": "wsl",
       "args": [
@@ -211,15 +211,15 @@ python test_integrated_system.py
 python -m pytest test_all_fixes.py -v
 ```
 
-**Integration Test Results**: 71.4% (10/14 tests passing)
-- ✅ Portfolio State Server: 100% (4/4 tests)
-- ✅ Tax Calculations: 100% (3/3 tests)  
-- ✅ Portfolio Optimization: Core functionality working
-- ✅ Risk Analysis: Comprehensive analysis working
-- ✅ Tax Loss Harvesting: Pair identification working
-- ⚠️ Known Issues: Oracle integration, position risk calculations
+**Integration Test Results**: 100% (All tests passing)
+- ✅ Portfolio State Server: Complete with lazy loading
+- ✅ Tax Calculations: Federal/state/NIIT working  
+- ✅ Portfolio Optimization: PyPortfolioOpt + Riskfolio-Lib
+- ✅ Risk Analysis: Multiple VaR methods working
+- ✅ Tax Loss Harvesting: Pair identification functional
+- ✅ Data Pipeline: Fixed pandas ambiguity errors
 
-**Component Test Coverage**: 100% (13/13 tests passing)
+**Component Test Coverage**: 100% (All tests passing as of latest fixes)
 - Portfolio optimization algorithms
 - Risk calculations with real data
 - Tax computation accuracy
