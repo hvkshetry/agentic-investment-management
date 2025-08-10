@@ -275,6 +275,25 @@ class MarketDataPipeline:
         if not start_date:
             start_date = (datetime.now() - timedelta(days=504)).strftime('%Y-%m-%d')  # 2 years
         
+        # Resolve ticker aliases for Yahoo Finance compatibility
+        original_tickers = tickers.copy()
+        resolved_tickers = []
+        ticker_map = {}  # Map resolved back to original
+        
+        for ticker in tickers:
+            resolved = self.resolve_ticker(ticker)
+            if resolved:
+                resolved_tickers.append(resolved)
+                ticker_map[resolved] = ticker
+            else:
+                logger.warning(f"Could not resolve ticker {ticker}, skipping")
+        
+        if not resolved_tickers:
+            raise ValueError(f"Could not resolve any tickers from {tickers}")
+        
+        # Use resolved tickers for fetching
+        tickers_to_fetch = resolved_tickers
+        
         # Check shared cache first if available
         if self.shared_cache:
             # Try to get prices from shared cache
@@ -282,10 +301,10 @@ class MarketDataPipeline:
             if cached_prices:
                 logger.info(f"Found {len(cached_prices)} prices in shared cache")
         
-        # Check local cache
-        cache_key = self._get_cache_key(tickers, start_date, end_date)
+        # Check local cache (use original tickers for cache key)
+        cache_key = self._get_cache_key(original_tickers, start_date, end_date)
         if cache_key in self.cache and self._is_cache_valid(self.cache[cache_key]):
-            logger.info(f"Using cached data for {tickers}")
+            logger.info(f"Using cached data for {original_tickers}")
             return self.cache[cache_key]['data']
         
         # Try Portfolio State Server for current prices (if client provided and fetching recent data)
@@ -321,11 +340,12 @@ class MarketDataPipeline:
                 logger.warning(f"Could not fetch prices from Portfolio State: {e}")
         
         try:
-            if self.use_openbb:  # Enable OpenBB for equity data
+            # Try to use OpenBB first (lazy load via property)
+            if self.obb is not None:  # This will trigger lazy loading
                 try:
-                    # Use OpenBB for data fetching
+                    # Use OpenBB for data fetching (with resolved tickers)
                     data = self.obb.equity.price.historical(
-                        symbol=tickers,
+                        symbol=tickers_to_fetch,
                         start=start_date,
                         end=end_date,
                         provider='yfinance'  # Can switch providers
@@ -337,11 +357,11 @@ class MarketDataPipeline:
                     self.use_openbb = False  # Fallback for this request
             
             if not self.use_openbb and self.yf_available:
-                # Fallback to yfinance
-                if len(tickers) == 1:
+                # Fallback to yfinance (with resolved tickers)
+                if len(tickers_to_fetch) == 1:
                     # Single ticker - download directly
                     data = self.yf.download(
-                        tickers[0],
+                        tickers_to_fetch[0],
                         start=start_date,
                         end=end_date,
                         progress=False
@@ -387,7 +407,7 @@ class MarketDataPipeline:
                 else:
                     # Multiple tickers - handle MultiIndex
                     data = self.yf.download(
-                        tickers,
+                        tickers_to_fetch,
                         start=start_date,
                         end=end_date,
                         progress=False
@@ -420,6 +440,14 @@ class MarketDataPipeline:
                 # Ensure we have a DataFrame with ticker columns
                 if isinstance(prices_df, pd.Series):
                     prices_df = prices_df.to_frame(tickers[0] if tickers else 'UNKNOWN')
+            
+            # Map columns back to original ticker names
+            if len(ticker_map) > 0:
+                # Rename columns from resolved (e.g., BRK-B) to original (e.g., BRKB)
+                column_mapping = {resolved: original for resolved, original in ticker_map.items()}
+                prices_df = prices_df.rename(columns=column_mapping)
+                # Update tickers to use original names
+                tickers = original_tickers
             
             # Calculate returns
             returns_df = prices_df.pct_change().dropna()
@@ -496,7 +524,8 @@ class MarketDataPipeline:
             Dictionary with rate and metadata
         """
         try:
-            if self.obb and self.use_openbb:
+            # Try to access OpenBB (will trigger lazy loading)
+            if self.obb is not None:
                 # Map common maturity formats to OpenBB/FRED format
                 maturity_map = {
                     '3m': '3month',
@@ -511,64 +540,91 @@ class MarketDataPipeline:
                 obb_maturity = maturity_map.get(maturity, maturity)
                 
                 try:
-                    # Fetch yield curve data from OpenBB FRED provider
-                    logger.info(f"Fetching yield curve from OpenBB for {maturity} rate")
-                    yield_curve = self.obb.fixedincome.government.yield_curve(provider='fred')
+                    # Fetch treasury rates data from OpenBB
+                    logger.info(f"Fetching treasury rates from OpenBB for {maturity} rate")
                     
-                    if yield_curve and hasattr(yield_curve, 'results') and yield_curve.results:
-                        # Map maturity to yield curve field
-                        maturity_field_map = {
-                            '3m': 'month_3',
-                            '6m': 'month_6',
-                            '1y': 'year_1',
-                            '2y': 'year_2',
-                            '5y': 'year_5',
-                            '10y': 'year_10',
-                            '30y': 'year_30'
-                        }
+                    # Get date range
+                    end_date = datetime.now()
+                    start_date = end_date - timedelta(days=30)  # Get last month's data
+                    
+                    # Try FRED provider first
+                    try:
+                        treasury_data = self.obb.fixedincome.government.treasury_rates(
+                            start_date=start_date.strftime('%Y-%m-%d'),
+                            end_date=end_date.strftime('%Y-%m-%d'),
+                            provider='fred'
+                        )
+                    except Exception as fred_error:
+                        logger.warning(f"FRED treasury rates failed: {fred_error}, trying FMP")
+                        treasury_data = self.obb.fixedincome.government.treasury_rates(
+                            start_date=start_date.strftime('%Y-%m-%d'),
+                            end_date=end_date.strftime('%Y-%m-%d'),
+                            provider='fmp'
+                        )
+                    
+                    if treasury_data and hasattr(treasury_data, 'results') and treasury_data.results:
+                        # Get the latest treasury rates
+                        latest_rates = treasury_data.results[-1] if treasury_data.results else None
                         
-                        target_maturity = maturity_field_map.get(maturity, 'year_10')
-                        
-                        # Find the rate for our maturity
-                        rate = None
-                        for point in yield_curve.results:
-                            if str(point.maturity) == target_maturity:
-                                # Rate is stored in model_extra dict
-                                rate = point.model_extra.get('rate', None)
-                                if rate is not None:
-                                    logger.info(f"Successfully fetched {maturity} treasury rate from yield curve: {rate:.4f}")
-                                    break
+                        if latest_rates:
+                            # Map maturity to treasury rate field
+                            maturity_field_map = {
+                                '3m': 'month_3',
+                                '6m': 'month_6',
+                                '1y': 'year_1',
+                                '2y': 'year_2',
+                                '5y': 'year_5',
+                                '10y': 'year_10',
+                                '30y': 'year_30'
+                            }
+                            
+                            target_field = maturity_field_map.get(maturity, 'year_10')
+                            
+                            # Try to get the rate from the appropriate field
+                            rate = getattr(latest_rates, target_field, None)
+                            
+                            if rate is not None:
+                                # Convert percentage to decimal if needed
+                                if rate > 1:
+                                    rate = rate / 100
+                                logger.info(f"Successfully fetched {maturity} treasury rate: {rate:.4f}")
                         
                         # If specific maturity not found, use closest match
                         if rate is None:
                             if maturity in ['3m', '6m']:
-                                # Use short-term rate
-                                for point in yield_curve.results:
-                                    if point.maturity == 'month_3':
-                                        rate = point.model_extra.get('rate', None)
-                                        if rate is not None:
-                                            logger.info(f"Using 3-month rate for {maturity}: {rate:.4f}")
-                                            break
+                                # Use 3-month rate
+                                rate = getattr(latest_rates, 'month_3', None)
+                                if rate is not None:
+                                    if rate > 1:
+                                        rate = rate / 100
+                                    logger.info(f"Using 3-month rate for {maturity}: {rate:.4f}")
                             else:
                                 # Use 10-year as default for longer maturities
-                                for point in yield_curve.results:
-                                    if point.maturity == 'year_10':
-                                        rate = point.model_extra.get('rate', None)
-                                        if rate is not None:
-                                            logger.info(f"Using 10-year rate for {maturity}: {rate:.4f}")
-                                            break
+                                rate = getattr(latest_rates, 'year_10', None)
+                                if rate is not None:
+                                    if rate > 1:
+                                        rate = rate / 100
+                                    logger.info(f"Using 10-year rate for {maturity}: {rate:.4f}")
                         
                         if rate is None:
-                            raise ValueError(f"Could not extract rate from yield curve for {maturity}")
+                            raise ValueError(f"Could not extract rate from treasury data for {maturity}")
                     else:
-                        raise ValueError(f"No yield curve data returned from OpenBB")
+                        raise ValueError(f"No treasury rates data returned from OpenBB")
                         
                 except Exception as obb_error:
                     logger.warning(f"OpenBB yield curve fetch failed: {obb_error}, trying SOFR/EFFR")
                     # Try alternative: use SOFR or EFFR as risk-free proxy
                     try:
+                        # Get date range for API calls
+                        end_date = datetime.now()
+                        start_date = end_date - timedelta(days=7)  # Get last week's data
+                        
                         # Try SOFR first (Secured Overnight Financing Rate)
-                        sofr_data = self.obb.fixedincome.rate.sofr(provider='fred')
+                        sofr_data = self.obb.fixedincome.rate.sofr(
+                            start_date=start_date.strftime('%Y-%m-%d'),
+                            end_date=end_date.strftime('%Y-%m-%d'),
+                            provider='fred'
+                        )
                         if sofr_data and hasattr(sofr_data, 'results') and sofr_data.results:
                             latest_sofr = sofr_data.results[-1]
                             base_rate = latest_sofr.rate  # Already in decimal format
@@ -588,7 +644,11 @@ class MarketDataPipeline:
                             logger.info(f"Using SOFR + term premium for {maturity}: {rate:.4f} (base SOFR: {base_rate:.4f})")
                         else:
                             # Try EFFR (Effective Federal Funds Rate)
-                            effr_data = self.obb.fixedincome.rate.effr(provider='fred')
+                            effr_data = self.obb.fixedincome.rate.effr(
+                                start_date=start_date.strftime('%Y-%m-%d'),
+                                end_date=end_date.strftime('%Y-%m-%d'),
+                                provider='fred'
+                            )
                             if effr_data and hasattr(effr_data, 'results') and effr_data.results:
                                 latest_effr = effr_data.results[-1]
                                 base_rate = latest_effr.rate
@@ -611,10 +671,10 @@ class MarketDataPipeline:
                                 raise ValueError(f"Unable to fetch any risk-free rate data from OpenBB")
                     except Exception as fallback_error:
                         logger.error(f"All risk-free rate sources failed: {fallback_error}")
-                        raise ValueError(f"Unable to fetch risk-free rate for {maturity} from any source")
+                        raise ValueError(f"Unable to fetch risk-free rate for {maturity} from any source: {fallback_error}")
                         
             else:
-                # No OpenBB available - must fail explicitly
+                # No OpenBB available - must fail explicitly (no fallback allowed)
                 logger.error("OpenBB not available for fetching risk-free rates")
                 raise ValueError(f"OpenBB is required for fetching risk-free rates. Install with: pip install openbb")
             

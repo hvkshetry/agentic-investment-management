@@ -20,6 +20,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 # Import shared modules
 from data_pipeline import MarketDataPipeline
 from confidence_scoring import ConfidenceScorer
+from portfolio_state_client import get_portfolio_state_client
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +34,7 @@ logger = logging.getLogger("risk-server-v3")
 server = FastMCP("Risk Analyzer v3 - Consolidated")
 data_pipeline = MarketDataPipeline()
 confidence_scorer = ConfidenceScorer()
+portfolio_state_client = get_portfolio_state_client()
 
 @server.tool()
 async def analyze_portfolio_risk(
@@ -71,20 +73,51 @@ async def analyze_portfolio_risk(
         include_advanced = options.get('include_advanced_measures', True)
         var_methods = options.get('var_methods', ['historical', 'parametric', 'cornish-fisher'])
         custom_scenarios = options.get('custom_scenarios', None)
+        use_portfolio_state = options.get('use_portfolio_state', portfolio_state_client.use_portfolio_state)
+        
+        # Try to use real portfolio positions if available
+        actual_tickers = tickers
+        actual_weights = weights
+        portfolio_source = "provided"
+        
+        if use_portfolio_state and (tickers is None or tickers == ["PORTFOLIO"]):
+            try:
+                logger.info("Fetching real portfolio positions from Portfolio State")
+                positions = await portfolio_state_client.get_positions()
+                
+                if positions:
+                    # Use actual portfolio composition
+                    actual_tickers = list(positions.keys())
+                    total_value = sum(pos.current_value for pos in positions.values())
+                    actual_weights = [positions[ticker].current_value / total_value for ticker in actual_tickers]
+                    portfolio_source = "portfolio_state"
+                    logger.info(f"Using {len(actual_tickers)} positions from Portfolio State")
+                else:
+                    logger.warning("No positions found in Portfolio State, using provided tickers")
+            except Exception as e:
+                logger.warning(f"Could not fetch from Portfolio State: {e}, using provided tickers")
+        
+        # Ensure we have tickers to analyze
+        if not actual_tickers:
+            raise ValueError("No tickers provided and no positions in Portfolio State")
         
         # Fetch real market data with quality assessment
-        logger.info(f"Fetching {lookback_days} days of data for {tickers}")
-        data = data_pipeline.prepare_for_optimization(tickers, lookback_days)
+        logger.info(f"Fetching {lookback_days} days of data for {actual_tickers}")
+        data = data_pipeline.prepare_for_optimization(actual_tickers, lookback_days)
         returns = data['returns'].values
         prices = data['prices'].values
         
-        # Default to equal weights
-        if weights is None:
-            weights = np.ones(len(tickers)) / len(tickers)
+        # Default to equal weights if not provided
+        if actual_weights is None:
+            actual_weights = np.ones(len(actual_tickers)) / len(actual_tickers)
         else:
-            weights = np.array(weights)
+            actual_weights = np.array(actual_weights)
             # Normalize weights
-            weights = weights / np.sum(weights)
+            actual_weights = actual_weights / np.sum(actual_weights)
+        
+        # Update variables for consistency
+        tickers = actual_tickers
+        weights = actual_weights
         
         # Portfolio returns
         portfolio_returns = returns @ weights
@@ -407,11 +440,13 @@ async def analyze_portfolio_risk(
         result["metadata"] = {
             "analysis_timestamp": datetime.now().isoformat(),
             "data_source": data['metadata']['source'],
+            "portfolio_source": portfolio_source,
             "lookback_days": lookback_days,
             "sample_size": len(portfolio_returns),
             "covariance_method": 'ledoit_wolf' if 'shrinkage_intensity' in data else 'sample',
             "shrinkage_intensity": data.get('shrinkage_intensity', 0),
-            "condition_number": float(condition_number)
+            "condition_number": float(condition_number),
+            "using_portfolio_state": portfolio_source == "portfolio_state"
         }
         
         # =========================

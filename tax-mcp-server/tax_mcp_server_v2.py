@@ -16,8 +16,9 @@ import tenforty
 # Add shared modules to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 
-# Import confidence scoring
+# Import confidence scoring and portfolio state
 from confidence_scoring import ConfidenceScorer
+from portfolio_state_client import get_portfolio_state_client
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +31,7 @@ logger = logging.getLogger("tax-server-v2")
 # Initialize components
 server = FastMCP("Tax Server v2 - Enhanced")
 confidence_scorer = ConfidenceScorer()
+portfolio_state_client = get_portfolio_state_client()
 
 @server.tool()
 async def calculate_comprehensive_tax(
@@ -94,6 +96,50 @@ async def calculate_comprehensive_tax(
         
         if credits is None:
             credits = {}
+        
+        # Try to get real capital gains from Portfolio State
+        use_portfolio_state = income_sources.get('use_portfolio_state', True)
+        portfolio_source = "provided"
+        
+        if use_portfolio_state and ('capital_gains_from_portfolio' in income_sources or 
+                                   income_sources.get('long_term_capital_gains', 0) == 0 and 
+                                   income_sources.get('short_term_capital_gains', 0) == 0):
+            try:
+                logger.info("Fetching real capital gains from Portfolio State")
+                
+                # Get tax lots
+                tax_lots = await portfolio_state_client.get_tax_lots()
+                positions = await portfolio_state_client.get_positions()
+                
+                if not tax_lots:
+                    raise ValueError("No tax lots found in Portfolio State")
+                
+                # Calculate actual capital gains from tax lots
+                long_term_gains = 0
+                short_term_gains = 0
+                
+                for symbol, position in positions.items():
+                    for lot in position.tax_lots:
+                        # Calculate gain/loss for this lot
+                        current_value = lot.quantity * position.current_price
+                        gain_loss = current_value - lot.cost_basis
+                        
+                        if lot.is_long_term:
+                            long_term_gains += gain_loss
+                        else:
+                            short_term_gains += gain_loss
+                
+                # Update income sources with real gains
+                income_sources['long_term_capital_gains'] = long_term_gains
+                income_sources['short_term_capital_gains'] = short_term_gains
+                portfolio_source = "portfolio_state"
+                
+                logger.info(f"Using real capital gains from Portfolio State: "
+                          f"LT: ${long_term_gains:,.2f}, ST: ${short_term_gains:,.2f}")
+                
+            except Exception as e:
+                logger.error(f"Failed to fetch from Portfolio State: {e}")
+                raise ValueError(f"Portfolio State required but failed: {e}")
         
         # Initialize result structure
         result = {
@@ -391,6 +437,8 @@ async def calculate_comprehensive_tax(
             "entity_type": entity_type,
             "filing_status": filing_status,
             "state": state,
+            "portfolio_source": portfolio_source,
+            "using_portfolio_state": portfolio_source == "portfolio_state",
             "features_included": {
                 "niit": include_niit,
                 "amt": include_amt,

@@ -17,6 +17,7 @@ import pulp
 
 # Add required paths
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared', 'services'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'portfolio-state-mcp-server'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'oracle'))
 
@@ -30,8 +31,11 @@ except ImportError as e:
     ORACLE_AVAILABLE = False
     print(f"Oracle import error: {e}")
 
-# Import confidence scoring
+# Import confidence scoring and shared services
 from confidence_scoring import ConfidenceScorer
+from tax_rate_service import get_tax_rate_service
+from portfolio_value_service import get_portfolio_value_service
+from correlation_service import get_correlation_service
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +48,9 @@ logger = logging.getLogger("tax-optimization-server")
 # Initialize components
 server = FastMCP("Tax Optimization Server - Oracle Powered")
 confidence_scorer = ConfidenceScorer()
+tax_rate_service = get_tax_rate_service()
+portfolio_value_service = get_portfolio_value_service()
+correlation_service = get_correlation_service()
 
 def get_tax_lots_by_symbol(portfolio_state):
     """Helper to get tax lots grouped by symbol from portfolio state"""
@@ -267,12 +274,26 @@ async def optimize_portfolio_for_taxes(
         # Create Oracle instance (expects datetime.date, not string)
         current_date = datetime.now().date()
         
-        # Create tax rates DataFrame with all required gain types
+        # Create tax rates DataFrame using TaxRateService
+        # Get representative income (use portfolio value as proxy)
+        portfolio_value = portfolio_value_service.get_portfolio_total_value(portfolio_state)
+        representative_income = portfolio_value * 0.04  # Assume 4% withdrawal rate
+        
+        # Get actual tax rates from service
+        st_federal = tax_rate_service.get_capital_gains_rate(representative_income, "Single", is_long_term=False)
+        lt_federal = tax_rate_service.get_capital_gains_rate(representative_income, "Single", is_long_term=True)
+        state_rate = tax_rate_service.get_state_rate(representative_income, "CA", "Single")  # Default to CA
+        niit_rate = tax_rate_service.get_niit_rate(representative_income, "Single")
+        
         tax_rates_df = pd.DataFrame({
             'gain_type': ['short_term', 'long_term', 'qualified_dividend'],
-            'federal_rate': [0.25, 0.15, 0.15],  # Qualified dividends taxed as LTCG
-            'state_rate': [0.05, 0.05, 0.05],    # Simplified state rates
-            'total_rate': [0.30, 0.20, 0.20]     # Combined federal + state
+            'federal_rate': [st_federal, lt_federal, lt_federal],  # Qualified dividends taxed as LTCG
+            'state_rate': [state_rate, state_rate, state_rate],
+            'total_rate': [
+                st_federal + state_rate + niit_rate,
+                lt_federal + state_rate + niit_rate,
+                lt_federal + state_rate + niit_rate
+            ]
         })
         
         oracle = Oracle(
@@ -409,11 +430,20 @@ async def optimize_portfolio_for_taxes(
                 # Check if long-term or short-term
                 purchase_date = pd.to_datetime(lot_info['date'])
                 days_held = (pd.Timestamp.now() - purchase_date).days
+                is_long_term = days_held > 365
                 
-                if days_held > 365:
-                    tax_impact = gain * 0.15  # Long-term rate
-                else:
-                    tax_impact = gain * 0.25  # Short-term rate
+                # Use actual tax rates from service
+                portfolio_value = portfolio_value_service.get_portfolio_total_value(portfolio_state)
+                representative_income = portfolio_value * 0.04
+                
+                tax_estimate = tax_rate_service.estimate_tax_on_sale(
+                    gain=gain,
+                    income=representative_income,
+                    filing_status="Single",
+                    state="CA",
+                    is_long_term=is_long_term
+                )
+                tax_impact = tax_estimate['total_tax']
                 
                 total_tax_impact += tax_impact
                 total_proceeds += trade_value
@@ -590,9 +620,13 @@ async def find_tax_loss_harvesting_pairs(
                             'current_holding': symbol,
                             'suggested_replacement': alternative,
                             'unrealized_loss': position['unrealized_loss'],
-                            'tax_benefit_estimate': position['unrealized_loss'] * 0.25,
+                            'tax_benefit_estimate': position['unrealized_loss'] * tax_rate_service.get_capital_gains_rate(
+                                portfolio_value_service.get_portfolio_total_value(portfolio_state) * 0.04,
+                                "Single",
+                                is_long_term=False
+                            ),
                             'asset_type': position['asset_type'],
-                            'correlation_estimate': 0.98  # High correlation for index ETFs
+                            'correlation_estimate': 0.98  # Default high correlation for known ETF pairs
                         })
         
         # Sort by tax benefit
@@ -600,7 +634,13 @@ async def find_tax_loss_harvesting_pairs(
         
         # Calculate total harvesting potential
         total_losses = sum(p['unrealized_loss'] for p in loss_positions)
-        total_tax_benefit = total_losses * 0.25  # Rough estimate
+        # Use actual tax rate for benefit calculation
+        portfolio_value = portfolio_value_service.get_portfolio_total_value(portfolio_state)
+        representative_income = portfolio_value * 0.04
+        avg_tax_rate = tax_rate_service.get_combined_capital_gains_rate(
+            representative_income, "Single", "CA", is_long_term=False
+        )
+        total_tax_benefit = total_losses * avg_tax_rate
         
         result = {
             "tlh_summary": {
@@ -674,13 +714,8 @@ async def simulate_withdrawal_tax_impact(
                 "confidence": 0.0
             }
         
-        # Calculate total portfolio value from cost basis
-        total_value = 0
-        tax_lots_by_symbol = get_tax_lots_by_symbol(portfolio_state)
-        for symbol, lots in tax_lots_by_symbol.items():
-            for lot in lots:
-                # Use cost basis as current value approximation
-                total_value += lot.get('cost_basis', 0)
+        # Calculate total portfolio value using PortfolioValueService
+        total_value = portfolio_value_service.get_portfolio_total_value(portfolio_state)
         
         if withdrawal_amount > total_value * 0.95:
             return {
@@ -730,8 +765,14 @@ async def simulate_withdrawal_tax_impact(
             if remaining_amount <= 0:
                 break
             
-            # Calculate lot value from cost basis
-            lot_value = lot.get('cost_basis', 0)
+            # Calculate lot value using PortfolioValueService
+            try:
+                lot_value = portfolio_value_service.get_lot_current_value(lot)
+            except ValueError:
+                # If we can't get current value, skip this lot
+                logger.warning(f"Could not get value for lot {lot.get('lot_id')}")
+                continue
+            
             if lot_value <= 0:
                 continue
             
@@ -739,13 +780,19 @@ async def simulate_withdrawal_tax_impact(
             sell_value = min(lot_value, remaining_amount)
             sell_ratio = sell_value / lot_value
             
-            # Calculate tax (approximate since we don't have current prices)
-            # Using cost basis as approximation
-            gain = 0  # Can't calculate real gain without current price
-            if lot.get('is_long_term', False):
-                tax = max(0, gain * 0.15)
-            else:
-                tax = max(0, gain * 0.25)
+            # Calculate actual gain using PortfolioValueService
+            gain = portfolio_value_service.get_lot_unrealized_gain(lot) * sell_ratio
+            
+            # Calculate tax using actual rates from TaxRateService
+            representative_income = total_value * 0.04
+            tax_estimate = tax_rate_service.estimate_tax_on_sale(
+                gain=gain,
+                income=representative_income,
+                filing_status="Single",
+                state="CA",
+                is_long_term=lot.get('is_long_term', False)
+            )
+            tax = tax_estimate['total_tax']
             
             withdrawal_trades.append({
                 'symbol': lot['symbol'],
@@ -753,7 +800,8 @@ async def simulate_withdrawal_tax_impact(
                 'sell_value': sell_value,
                 'gain_loss': gain,
                 'tax': tax,
-                'is_long_term': lot.get('is_long_term', False)
+                'is_long_term': lot.get('is_long_term', False),
+                'effective_tax_rate': (tax / gain * 100) if gain > 0 else 0
             })
             
             total_tax += tax
@@ -768,9 +816,12 @@ async def simulate_withdrawal_tax_impact(
             },
             "withdrawal_trades": withdrawal_trades[:20],  # Top 20 trades
             "tax_implications": {
-                "total_tax": total_tax,
-                "effective_tax_rate": (total_tax / withdrawal_amount * 100) if withdrawal_amount > 0 else 0,
-                "after_tax_proceeds": withdrawal_amount - total_tax
+                "estimated_tax": total_tax,
+                "effective_tax_rate": (total_tax / (withdrawal_amount - remaining_amount) * 100) if (withdrawal_amount - remaining_amount) > 0 else 0,
+                "after_tax_proceeds": (withdrawal_amount - remaining_amount) - total_tax,
+                "federal_portion": total_tax * 0.7,  # Rough estimate
+                "state_portion": total_tax * 0.25,
+                "niit_portion": total_tax * 0.05
             },
             "comparison": {
                 "method_used": optimization_method,

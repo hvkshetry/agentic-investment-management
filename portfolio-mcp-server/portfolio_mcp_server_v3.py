@@ -22,6 +22,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 # Import shared modules
 from data_pipeline import MarketDataPipeline
 from confidence_scoring import ConfidenceScorer
+from portfolio_state_client import get_portfolio_state_client
 
 # Configure logging
 logging.basicConfig(
@@ -35,15 +36,18 @@ logger = logging.getLogger("portfolio-server-v3")
 server = FastMCP("Portfolio Optimizer v3 - Professional Grade")
 data_pipeline = MarketDataPipeline()
 confidence_scorer = ConfidenceScorer()
+portfolio_state_client = get_portfolio_state_client()
 
 # Try to import advanced libraries
 try:
     import riskfolio as rp
+    # CVaR_Hist is directly in riskfolio module, not in RiskFunctions
+    CVaR_Hist = rp.CVaR_Hist if hasattr(rp, 'CVaR_Hist') else None
     RISKFOLIO_AVAILABLE = True
     logger.info("Riskfolio-Lib loaded successfully")
-except ImportError:
+except ImportError as e:
     RISKFOLIO_AVAILABLE = False
-    logger.error("Riskfolio-Lib not available - install with: pip install Riskfolio-Lib")
+    logger.error(f"Riskfolio-Lib not available: {e}")
 
 try:
     from pypfopt import EfficientFrontier, risk_models, expected_returns
@@ -97,11 +101,55 @@ async def optimize_portfolio_advanced(
         portfolio_value = config.get('portfolio_value', 1000000)
         risk_measure = config.get('risk_measure', 'MV')
         methods = config.get('optimization_methods', ['HRP', 'Black-Litterman', 'Mean-Risk', 'Risk-Parity'])
+        # Map special method names
+        if 'Mean-CVaR' in methods:
+            methods.append('Mean-Risk')  # Enable Mean-Risk optimization
+            config['risk_measures'] = config.get('risk_measures', []) + ['CVaR']
         market_views = config.get('market_views', None)
         confidence_level = config.get('confidence_level', 0.95)
         risk_free_rate = config.get('risk_free_rate', None)
         constraints = config.get('constraints', {})
         discrete_alloc = config.get('discrete_allocation', False)
+        use_portfolio_state = config.get('use_portfolio_state', True)  # Default to true - fail loudly
+        
+        # Get actual tickers and constraints from Portfolio State if requested
+        actual_tickers = tickers
+        portfolio_constraints = {}
+        portfolio_source = "provided"
+        
+        if use_portfolio_state and (tickers is None or tickers == ["PORTFOLIO"]):
+            logger.info("Fetching real portfolio positions from Portfolio State")
+            positions = await portfolio_state_client.get_positions()
+            
+            if not positions:
+                raise ValueError("No positions found in Portfolio State")
+            
+            # Use actual portfolio tickers
+            actual_tickers = list(positions.keys())
+            portfolio_source = "portfolio_state"
+            
+            # Get actual portfolio value
+            portfolio_value = await portfolio_state_client.get_portfolio_value()
+            
+            # Add position constraints - can't sell more than we own
+            portfolio_constraints['max_position'] = {
+                symbol: pos.total_quantity for symbol, pos in positions.items()
+            }
+            portfolio_constraints['current_weights'] = {
+                symbol: pos.current_value / portfolio_value for symbol, pos in positions.items()
+            }
+            
+            logger.info(f"Using {len(actual_tickers)} positions from Portfolio State, value: ${portfolio_value:,.2f}")
+        
+        # Ensure we have tickers
+        if not actual_tickers:
+            raise ValueError("No tickers provided and Portfolio State has no positions")
+        
+        # Update tickers for consistency
+        tickers = actual_tickers
+        
+        # Merge constraints
+        constraints.update(portfolio_constraints)
         
         # Fetch real market data
         logger.info(f"Fetching {lookback_days} days of data for {tickers}")
@@ -288,10 +336,14 @@ async def optimize_portfolio_advanced(
             # Note: 'd' parameter removed - not supported in current Riskfolio-Lib version
             port.assets_stats(method_mu='hist', method_cov='ledoit')
             
-            # Risk measures mapping
-            risk_measures = {
-                'MV': 'Variance',  # Standard deviation
-                'CVaR': 'CVaR',  # Conditional Value at Risk
+            # Only support properly implemented risk measures
+            supported_risk_measures = {
+                'MV': 'Variance',  # Standard deviation - IMPLEMENTED
+                'CVaR': 'CVaR',  # Conditional Value at Risk - IMPLEMENTED
+            }
+            
+            # These are not yet implemented - log them but don't process
+            unsupported_measures = {
                 'EVaR': 'EVaR',  # Entropic Value at Risk
                 'WR': 'WR',  # Worst Realization
                 'RG': 'RG',  # Range
@@ -302,13 +354,19 @@ async def optimize_portfolio_advanced(
                 'EDR': 'EDR'  # Entropic Drawdown at Risk
             }
             
-            # Optimize for each requested risk measure
-            for risk_key, risk_name in risk_measures.items():
-                if risk_key in config.get('risk_measures', ['MV', 'CVaR']):
+            # Log unsupported measures if requested
+            requested_measures = config.get('risk_measures', ['MV', 'CVaR'])
+            for measure in requested_measures:
+                if measure in unsupported_measures:
+                    logger.warning(f"Risk measure {measure} ({unsupported_measures[measure]}) not yet implemented, skipping")
+            
+            # Optimize for each supported risk measure
+            for risk_key, risk_name in supported_risk_measures.items():
+                if risk_key in requested_measures:
                     try:
-                        # Set constraints
-                        port.upperlng = constraints.get('max_weight', 1)
-                        port.lowerlng = constraints.get('min_weight', 0)
+                        # Set constraints with proper defaults
+                        port.upperlng = float(constraints.get('max_weight', 1.0))  # Max 100% per asset
+                        port.lowerlng = float(constraints.get('min_weight', 0.0))  # Min 0% per asset
                         
                         # Optimize
                         weights = port.optimization(
@@ -327,15 +385,26 @@ async def optimize_portfolio_advanced(
                             port_return = port.mu @ weights.values
                             
                             # Calculate risk based on the measure used
-                            if risk_name == 'Variance':
+                            if risk_name == 'Variance' or risk_name == 'MV':
                                 # Standard deviation
                                 port_risk = np.sqrt(weights.values.T @ port.cov @ weights.values)
+                            elif risk_name == 'CVaR':
+                                # Calculate CVaR using proper method
+                                try:
+                                    # Calculate portfolio returns
+                                    portfolio_returns = returns_df @ weights.values
+                                    # Calculate CVaR directly (5% significance level)
+                                    sorted_returns = np.sort(portfolio_returns.values.flatten())
+                                    var_index = int(len(sorted_returns) * 0.05)
+                                    port_risk = float(-np.mean(sorted_returns[:var_index]))
+                                    logger.info(f"Calculated CVaR: {port_risk:.4f}")
+                                except Exception as e:
+                                    logger.error(f"Failed to calculate CVaR: {e}")
+                                    raise ValueError(f"Unable to calculate CVaR risk measure: {e}")
                             else:
-                                # For other measures, try to get from port object or calculate
-                                port_risk = getattr(port, 'risk', 0.0)
-                                if port_risk == 0.0:
-                                    # Fallback to standard deviation
-                                    port_risk = np.sqrt(weights.values.T @ port.cov @ weights.values)
+                                # This should not happen as we only iterate over supported measures
+                                logger.error(f"Unexpected risk measure {risk_name}")
+                                continue
                             
                             result["optimal_portfolios"][f"Riskfolio-{risk_key}"] = {
                                 "method": f"Riskfolio optimization ({risk_name})",
@@ -346,7 +415,7 @@ async def optimize_portfolio_advanced(
                                 "optimization_success": True
                             }
                     except Exception as e:
-                        logger.warning(f"Riskfolio {risk_name} optimization failed: {e}")
+                        logger.warning(f"Riskfolio {risk_key} optimization failed: {e}")
             
             # Risk Parity Portfolio
             if 'Risk-Parity' in methods:
@@ -465,11 +534,14 @@ async def optimize_portfolio_advanced(
         result["metadata"] = {
             "timestamp": datetime.now().isoformat(),
             "tickers": tickers,
+            "portfolio_source": portfolio_source,
+            "portfolio_value": portfolio_value,
             "lookback_days": lookback_days,
             "sample_size": len(returns_df),
             "risk_free_rate": risk_free_rate,
             "optimization_methods": methods,
-            "shrinkage_intensity": shrinkage_intensity if PYPFOPT_AVAILABLE else None
+            "shrinkage_intensity": shrinkage_intensity if PYPFOPT_AVAILABLE else None,
+            "using_portfolio_state": portfolio_source == "portfolio_state"
         }
         
         # Check if any optimization succeeded
