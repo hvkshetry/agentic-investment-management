@@ -20,6 +20,8 @@ numpy>=1.24.0                 # Numerical computing
 PyPortfolioOpt>=1.5.5         # Efficient frontier, Black-Litterman, HRP
 Riskfolio-Lib>=6.0.0          # Advanced portfolio optimization (13+ risk measures)
 cvxpy>=1.4.0                  # Convex optimization (required by Riskfolio-Lib)
+bt>=0.2.10                    # Backtesting library for strategy execution
+pulp>=2.7.0                   # Linear programming (used by Oracle)
 
 # =============================================================================
 # Statistical & ML Libraries

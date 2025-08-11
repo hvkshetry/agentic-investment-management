@@ -53,8 +53,12 @@ Server    Opt v3     Server    Server (Oracle)
 - **Modern Portfolio Theory**: Efficient frontier with actual holdings
 - **Tax-Aware Rebalancing**: Minimize tax impact during rebalancing
 - **Oracle Integration**: Advanced optimization with CBC solver
-- **Advanced Objectives**: 13+ Riskfolio-Lib measures
-- **Constraints**: Long-only, position limits, tax considerations
+- **Advanced Objectives**: 13+ Riskfolio-Lib risk measures
+- **Hierarchical Risk Parity**: Robust allocation without correlation matrix
+- **Walk-Forward Validation**: Prevent overfitting with out-of-sample testing
+- **Quantum-Inspired Optimization**: Cardinality constraints for position limits
+- **Market Views Incorporation**: Entropy pooling and Black-Litterman models
+- **Multi-Period Optimization**: Tax-aware trajectory planning
 
 ### Tax Optimization (Oracle-Powered)
 - **Tax Loss Harvesting**: Automated TLH pair identification
@@ -204,12 +208,24 @@ Create `~/.openbb_platform/user_settings.json`:
 # Activate environment
 source openbb/bin/activate
 
+# Run integrated enhancement tests (NEW)
+python test_integrated_enhancements.py
+
 # Run integrated system tests
 python test_integrated_system.py
 
 # Run individual component tests
 python -m pytest test_all_fixes.py -v
 ```
+
+**Enhancement Test Results**: 100% (14/14 tests passing)
+- ✅ Backtesting Engine: bt library integration for strategy execution
+- ✅ Walk-Forward Validation: Out-of-sample testing to prevent overfitting
+- ✅ Combinatorial Purged CV: Time series cross-validation
+- ✅ Multi-Period Optimization: Tax-aware rebalancing trajectory
+- ✅ Views Entropy Pooling: Market views incorporation
+- ✅ Black-Litterman Model: Equilibrium-based optimization
+- ✅ Quantum Optimizer: Cardinality-constrained portfolios
 
 **Integration Test Results**: 100% (All tests passing)
 - ✅ Portfolio State Server: Complete with lazy loading
@@ -218,13 +234,7 @@ python -m pytest test_all_fixes.py -v
 - ✅ Risk Analysis: Multiple VaR methods working
 - ✅ Tax Loss Harvesting: Pair identification functional
 - ✅ Data Pipeline: Fixed pandas ambiguity errors
-
-**Component Test Coverage**: 100% (All tests passing as of latest fixes)
-- Portfolio optimization algorithms
-- Risk calculations with real data
-- Tax computation accuracy
-- Market data integration
-- Data pipeline functionality
+- ✅ Oracle Integration: Fixed stdout issues for MCP JSON compatibility
 
 ## 📁 Project Structure
 
@@ -244,9 +254,20 @@ investing/
 │   └── tax_optimization_server.py
 ├── oracle/                      # Oracle optimization engine
 │   └── src/service/oracle.py
-├── shared/                      # Common utilities
-│   ├── data_pipeline.py
-│   └── confidence_scoring.py
+├── shared/                      # Common utilities and libraries
+│   ├── backtesting/            # bt library integration (NEW)
+│   │   ├── bt_engine.py       # Mechanical strategy execution
+│   │   └── strategies.py      # Strategy definitions
+│   ├── validation/             # Validation frameworks (NEW)
+│   │   ├── walk_forward.py    # Walk-forward validation
+│   │   ├── cross_validation.py # Combinatorial purged CV
+│   │   └── metrics.py         # Performance metrics
+│   ├── optimization/           # Advanced optimization (NEW)
+│   │   ├── multi_period.py    # Multi-period tax-aware
+│   │   ├── views_entropy.py   # Entropy pooling & Black-Litterman
+│   │   └── quantum.py         # Quantum-inspired optimization
+│   ├── data_pipeline.py       # Market data processing
+│   └── confidence_scoring.py  # Confidence metrics
 ├── agent-prompts/               # Claude Code agent system prompts
 │   ├── CLAUDE.md               # Main orchestrator
 │   └── sub-agents/             # 9 specialized analysts
@@ -272,4 +293,4 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Built with**: Claude Code, MCP Protocol, PyPortfolioOpt, Riskfolio-Lib, OpenBB
+**Built with**: Claude Code, MCP Protocol, PyPortfolioOpt, Riskfolio-Lib, OpenBB, bt (backtesting), PuLP (optimization solver)
