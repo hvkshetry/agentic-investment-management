@@ -438,7 +438,142 @@ async def analyze_portfolio_risk(
             }
         
         # =========================
-        # 7. CONFIDENCE SCORING
+        # 7. ADVANCED RISK ANALYTICS FROM SHARED LIBRARIES
+        # =========================
+        
+        # 7A. BACKTEST RISK PROFILE
+        if options.get('backtest_risk', False):
+            try:
+                from backtesting.bt_engine import BacktestEngine
+                bt_engine = BacktestEngine()
+                
+                # Run backtest with current weights
+                backtest_result = bt_engine.run_backtest(
+                    strategy='buy_and_hold',
+                    weights={tickers[i]: weights[i] for i in range(len(tickers))},
+                    data=prices,
+                    start_date=options.get('backtest_start'),
+                    end_date=options.get('backtest_end')
+                )
+                
+                result["backtest_risk_profile"] = {
+                    "historical_sharpe": backtest_result.get('sharpe', 0),
+                    "historical_sortino": backtest_result.get('sortino', 0),
+                    "historical_max_drawdown": backtest_result.get('max_drawdown', 0),
+                    "historical_calmar": backtest_result.get('calmar', 0),
+                    "performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Backtest risk profiling failed: {e}")
+                result["backtest_risk_profile"] = {"error": str(e), "performed": False}
+        
+        # 7B. VALIDATION-BASED RISK ASSESSMENT
+        if options.get('validate_risk_model', False):
+            try:
+                from validation.metrics import ValidationMetrics
+                val_metrics = ValidationMetrics()
+                
+                # Calculate comprehensive validation metrics
+                risk_validation = val_metrics.calculate_all_metrics(
+                    returns=portfolio_returns,
+                    benchmark_returns=options.get('benchmark_returns'),
+                    risk_free_rate=options.get('risk_free_rate', 0.02)
+                )
+                
+                result["risk_model_validation"] = {
+                    "stability_score": risk_validation.get('stability', 0),
+                    "information_ratio": risk_validation.get('information_ratio', 0),
+                    "calmar_ratio": risk_validation.get('calmar_ratio', 0),
+                    "validation_performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Risk model validation failed: {e}")
+                result["risk_model_validation"] = {"error": str(e), "validation_performed": False}
+        
+        # 7C. MULTI-PERIOD RISK EVOLUTION
+        if options.get('multi_period_risk', False):
+            try:
+                from optimization.multi_period import MultiPeriodOptimizer
+                mp_optimizer = MultiPeriodOptimizer()
+                
+                # Analyze how risk evolves over time with rebalancing
+                current_holdings = {tickers[i]: weights[i] for i in range(len(tickers))}
+                
+                # Generate dynamic rebalancing schedule based on volatility
+                dynamic_schedule = mp_optimizer.dynamic_rebalancing_schedule(
+                    volatility=pd.Series(portfolio_vol),
+                    correlation=corr_matrix,
+                    market_regime=options.get('market_regime', 'normal')
+                )
+                
+                result["multi_period_risk"] = {
+                    "rebalance_frequency": dynamic_schedule['rebalance_frequency_days'],
+                    "volatility_trigger": dynamic_schedule['triggers'].get('volatility_spike', False),
+                    "correlation_stability": dynamic_schedule['correlation_stability'],
+                    "risk_adjusted_schedule": dynamic_schedule['recommended_action'],
+                    "analysis_performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Multi-period risk analysis failed: {e}")
+                result["multi_period_risk"] = {"error": str(e), "analysis_performed": False}
+        
+        # 7D. SCENARIO-BASED RISK WITH VIEWS
+        if 'risk_scenarios' in options and options['risk_scenarios']:
+            try:
+                from optimization.views_entropy import ViewsEntropyPooling
+                entropy_pooler = ViewsEntropyPooling()
+                
+                # Incorporate scenario-based risk views
+                scenario_risk = entropy_pooler.scenario_based_views(
+                    scenarios=options['risk_scenarios'],
+                    probabilities=options.get('scenario_probabilities', [])
+                )
+                
+                result["scenario_risk_analysis"] = {
+                    "expected_var_95": scenario_risk['var_95'].to_dict(),
+                    "expected_cvar_95": scenario_risk['cvar_95'].to_dict(),
+                    "dominant_risk_scenario": scenario_risk['dominant_scenario'],
+                    "risk_adjusted_covariance": scenario_risk['covariance'].to_dict(),
+                    "analysis_performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Scenario risk analysis failed: {e}")
+                result["scenario_risk_analysis"] = {"error": str(e), "analysis_performed": False}
+        
+        # 7E. EXTREME RISK WITH QUANTUM METHODS
+        if options.get('extreme_risk_analysis', False):
+            try:
+                from optimization.quantum import QuantumOptimizer
+                quantum_opt = QuantumOptimizer()
+                
+                # Use quantum methods to identify extreme risk combinations
+                # Find worst-case asset selection that maximizes risk
+                extreme_risk_result = quantum_opt.multi_objective_optimization(
+                    objectives=[
+                        {'type': 'risk', 'weight': 1.0},  # Maximize risk to find worst case
+                        {'type': 'return', 'weight': -0.1}  # Slight penalty for zero return
+                    ],
+                    constraints={'cardinality': min(5, len(tickers))},
+                    universe=tickers
+                )
+                
+                result["extreme_risk_analysis"] = {
+                    "worst_case_assets": extreme_risk_result['selected_assets'],
+                    "extreme_risk_identified": len(extreme_risk_result['selected_assets']) > 0,
+                    "recommendation": "Avoid concentration in identified high-risk combinations",
+                    "analysis_performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Extreme risk analysis failed: {e}")
+                result["extreme_risk_analysis"] = {"error": str(e), "analysis_performed": False}
+        
+        # =========================
+        # 8. CONFIDENCE SCORING
         # =========================
         # Calculate condition number
         eigenvalues = np.linalg.eigvals(cov_matrix)
@@ -457,7 +592,7 @@ async def analyze_portfolio_risk(
         result["confidence"]["data_quality"] = data['quality']
         
         # =========================
-        # 8. METADATA
+        # 9. METADATA
         # =========================
         result["metadata"] = {
             "analysis_timestamp": datetime.now().isoformat(),
@@ -472,7 +607,7 @@ async def analyze_portfolio_risk(
         }
         
         # =========================
-        # 9. EXECUTIVE SUMMARY
+        # 10. EXECUTIVE SUMMARY
         # =========================
         result["executive_summary"] = {
             "risk_level": "HIGH" if annual_vol > 0.20 else "MODERATE" if annual_vol > 0.10 else "LOW",
@@ -497,6 +632,22 @@ async def analyze_portfolio_risk(
             result["executive_summary"]["recommendations"].append("Consider risk parity weighting for better diversification")
         if annual_vol > 0.25:
             result["executive_summary"]["recommendations"].append("Portfolio volatility is high - consider risk reduction")
+        
+        # Add advanced features to summary
+        advanced_features_used = []
+        if 'backtest_risk_profile' in result and result['backtest_risk_profile'].get('performed'):
+            advanced_features_used.append("Historical risk backtesting")
+        if 'risk_model_validation' in result and result['risk_model_validation'].get('validation_performed'):
+            advanced_features_used.append("Risk model validation")
+        if 'multi_period_risk' in result and result['multi_period_risk'].get('analysis_performed'):
+            advanced_features_used.append("Multi-period risk evolution")
+        if 'scenario_risk_analysis' in result and result['scenario_risk_analysis'].get('analysis_performed'):
+            advanced_features_used.append("Scenario-based risk analysis")
+        if 'extreme_risk_analysis' in result and result['extreme_risk_analysis'].get('analysis_performed'):
+            advanced_features_used.append("Extreme risk identification")
+        
+        if advanced_features_used:
+            result["executive_summary"]["advanced_features"] = advanced_features_used
         
         return result
         

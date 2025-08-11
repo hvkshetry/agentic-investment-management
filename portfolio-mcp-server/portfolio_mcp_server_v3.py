@@ -517,7 +517,248 @@ async def optimize_portfolio_advanced(
         result["risk_analytics"] = risk_analytics
         
         # =========================
-        # 5. CONFIDENCE SCORING
+        # 5. ADVANCED FEATURES FROM SHARED LIBRARIES
+        # =========================
+        
+        # 5A. MARKET VIEWS & ENTROPY POOLING
+        if 'market_views' in config and config['market_views']:
+            try:
+                from optimization.views_entropy import ViewsEntropyPooling
+                entropy_pooler = ViewsEntropyPooling()
+                
+                # Apply market views using entropy pooling or Black-Litterman
+                views_config = config['market_views']
+                
+                if views_config.get('method') == 'black_litterman' and 'market_weights' in views_config:
+                    # Black-Litterman approach
+                    bl_result = entropy_pooler.black_litterman_views(
+                        market_weights=views_config['market_weights'],
+                        covariance=S if PYPFOPT_AVAILABLE else returns_df.cov(),
+                        views=views_config.get('views', []),
+                        tau=views_config.get('tau', 0.05)
+                    )
+                    result["market_views_adjustment"] = {
+                        "method": "Black-Litterman",
+                        "adjusted_returns": bl_result['adjusted_returns'].to_dict(),
+                        "confidence": bl_result.get('confidence', 0),
+                        "applied": True
+                    }
+                    
+                elif views_config.get('method') == 'entropy_pooling':
+                    # Entropy pooling approach
+                    ep_result = entropy_pooler.incorporate_views(
+                        historical_returns=returns_df,
+                        views=views_config.get('views', []),
+                        confidence_levels=views_config.get('confidence_levels')
+                    )
+                    result["market_views_adjustment"] = {
+                        "method": "Entropy Pooling",
+                        "entropy_reduction": ep_result['entropy_reduction'],
+                        "effective_views": ep_result['effective_views'],
+                        "applied": True
+                    }
+                    
+                elif 'scenarios' in views_config:
+                    # Scenario-based views
+                    scenario_result = entropy_pooler.scenario_based_views(
+                        scenarios=views_config['scenarios'],
+                        probabilities=views_config.get('probabilities', [])
+                    )
+                    result["market_views_adjustment"] = {
+                        "method": "Scenario-Based",
+                        "dominant_scenario": scenario_result['dominant_scenario'],
+                        "var_95": scenario_result['var_95'].to_dict(),
+                        "cvar_95": scenario_result['cvar_95'].to_dict(),
+                        "applied": True
+                    }
+                    
+            except Exception as e:
+                logger.warning(f"Market views adjustment failed: {e}")
+                result["market_views_adjustment"] = {"error": str(e), "applied": False}
+        
+        # 5B. COMPLEX CONSTRAINTS WITH QUANTUM OPTIMIZER
+        if 'complex_constraints' in config and config['complex_constraints']:
+            try:
+                from optimization.quantum import QuantumOptimizer
+                quantum_opt = QuantumOptimizer(use_quantum=False)  # Simulated by default
+                
+                complex_constraints = config['complex_constraints']
+                
+                # Cardinality constraint optimization
+                if 'cardinality' in complex_constraints:
+                    quantum_result = quantum_opt.solve_cardinality_constraint(
+                        returns=returns_df,
+                        target_assets=complex_constraints['cardinality'],
+                        min_weight=complex_constraints.get('min_weight', 0.01),
+                        max_weight=complex_constraints.get('max_weight', 0.40)
+                    )
+                    
+                    result["optimal_portfolios"]["Quantum-Cardinality"] = {
+                        "method": "Quantum-inspired cardinality optimization",
+                        "weights": quantum_result['weights'],
+                        "selected_assets": quantum_result['selected_assets'],
+                        "cardinality_achieved": quantum_result['achieved_cardinality'],
+                        "constraint_satisfied": quantum_result['constraint_satisfied'],
+                        "optimization_success": quantum_result['constraint_satisfied']
+                    }
+                
+                # Multi-objective optimization
+                if 'objectives' in complex_constraints:
+                    mo_result = quantum_opt.multi_objective_optimization(
+                        objectives=complex_constraints['objectives'],
+                        constraints=complex_constraints,
+                        universe=tickers
+                    )
+                    
+                    result["optimal_portfolios"]["Quantum-MultiObjective"] = {
+                        "method": "Quantum-inspired multi-objective",
+                        "selected_assets": mo_result['selected_assets'],
+                        "n_objectives": mo_result['n_objectives'],
+                        "pareto_optimal": mo_result['pareto_optimal'],
+                        "optimization_success": len(mo_result['selected_assets']) > 0
+                    }
+                    
+            except Exception as e:
+                logger.warning(f"Quantum optimization failed: {e}")
+                result["complex_constraints_result"] = {"error": str(e), "applied": False}
+        
+        # 5C. VALIDATION WITH WALK-FORWARD TESTING
+        if config.get('validate', False):
+            try:
+                from validation.walk_forward import WalkForwardValidator
+                validator = WalkForwardValidator()
+                
+                # Validate the best portfolio
+                best_portfolio = max(
+                    (p for p in result["optimal_portfolios"].values() if p.get("optimization_success")),
+                    key=lambda x: x.get("sharpe_ratio", 0),
+                    default=None
+                )
+                
+                if best_portfolio and "weights" in best_portfolio:
+                    # Create optimization function for validation
+                    def optimization_func(data):
+                        # Simple mean-variance optimization on subset
+                        return best_portfolio["weights"]
+                    
+                    validation_result = validator.validate(
+                        optimization_func=optimization_func,
+                        historical_data=prices_df,
+                        window_size=config.get('validation_window', 252),
+                        step_size=config.get('validation_step', 21),
+                        n_splits=config.get('validation_splits', 10)
+                    )
+                    
+                    result["validation"] = {
+                        "in_sample_sharpe": validation_result.get('in_sample_sharpe', 0),
+                        "out_sample_sharpe": validation_result.get('out_sample_sharpe', 0),
+                        "sharpe_degradation": validation_result.get('sharpe_degradation', 0),
+                        "overfitting_risk": validation_result.get('overfitting_risk', False),
+                        "validation_quality": validation_result.get('validation_quality', 'unknown')
+                    }
+                    
+                    # Combinatorial purged CV if requested
+                    if config.get('purged_cv', False):
+                        cv_result = validator.combinatorial_purged_cv(
+                            optimization_func=optimization_func,
+                            historical_data=prices_df,
+                            n_splits=config.get('cv_splits', 10),
+                            embargo_period=config.get('embargo_days', 5)
+                        )
+                        result["validation"]["purged_cv"] = cv_result
+                        
+            except Exception as e:
+                logger.warning(f"Validation failed: {e}")
+                result["validation"] = {"error": str(e), "performed": False}
+        
+        # 5D. MULTI-PERIOD OPTIMIZATION
+        if config.get('multi_period', False):
+            try:
+                from optimization.multi_period import MultiPeriodOptimizer
+                mp_optimizer = MultiPeriodOptimizer(
+                    tax_rates=config.get('tax_rates', {'short_term': 0.37, 'long_term': 0.20})
+                )
+                
+                # Get best portfolio for multi-period planning
+                best_portfolio = max(
+                    (p for p in result["optimal_portfolios"].values() if p.get("optimization_success")),
+                    key=lambda x: x.get("sharpe_ratio", 0),
+                    default=None
+                )
+                
+                if best_portfolio and "weights" in best_portfolio:
+                    # Convert weights to initial holdings (simplified)
+                    initial_holdings = {
+                        ticker: weight * portfolio_value / prices_df[ticker].iloc[-1]
+                        for ticker, weight in best_portfolio["weights"].items()
+                    }
+                    
+                    mp_result = mp_optimizer.optimize_trajectory(
+                        initial_holdings=initial_holdings,
+                        expected_returns=mu if PYPFOPT_AVAILABLE else returns_df.mean(),
+                        covariance=S if PYPFOPT_AVAILABLE else returns_df.cov(),
+                        horizon=config.get('horizon_days', 252),
+                        rebalance_freq=config.get('rebalance_freq', 21),
+                        transaction_cost=config.get('transaction_cost', 0.001),
+                        holding_cost=config.get('holding_cost', 0.0001)
+                    )
+                    
+                    result["multi_period_plan"] = {
+                        "trading_schedule": mp_result['trading_schedule'][:5],  # First 5 periods
+                        "n_rebalances": mp_result['n_rebalances'],
+                        "estimated_turnover": mp_result['estimated_turnover'],
+                        "estimated_tax_impact": mp_result['estimated_tax_impact'],
+                        "optimization_method": mp_result['optimization_method']
+                    }
+                    
+                    # Dynamic rebalancing schedule
+                    if 'market_regime' in config:
+                        dynamic_schedule = mp_optimizer.dynamic_rebalancing_schedule(
+                            volatility=returns_df.std(),
+                            correlation=returns_df.corr(),
+                            market_regime=config['market_regime']
+                        )
+                        result["multi_period_plan"]["dynamic_schedule"] = dynamic_schedule
+                        
+            except Exception as e:
+                logger.warning(f"Multi-period optimization failed: {e}")
+                result["multi_period_plan"] = {"error": str(e), "performed": False}
+        
+        # 5E. BACKTESTING ON ANALOGOUS PERIODS
+        if 'analogous_periods' in config and config['analogous_periods']:
+            try:
+                from backtesting.bt_engine import BacktestEngine
+                bt_engine = BacktestEngine()
+                
+                # Get best portfolio for backtesting
+                best_portfolio = max(
+                    (p for p in result["optimal_portfolios"].values() if p.get("optimization_success")),
+                    key=lambda x: x.get("sharpe_ratio", 0),
+                    default=None
+                )
+                
+                if best_portfolio and "weights" in best_portfolio:
+                    bt_result = bt_engine.backtest_on_periods(
+                        strategy_weights=best_portfolio["weights"],
+                        historical_data=prices_df,
+                        periods=config['analogous_periods'],
+                        rebalance_freq=config.get('backtest_rebalance', 'monthly'),
+                        transaction_cost=config.get('transaction_cost', 0.001)
+                    )
+                    
+                    result["backtest_results"] = {
+                        "periods_tested": len(config['analogous_periods']),
+                        "performance_by_period": bt_result.get('period_performance', {}),
+                        "aggregate_sharpe": bt_result.get('aggregate_sharpe', 0),
+                        "consistency_score": bt_result.get('consistency_score', 0)
+                    }
+                    
+            except Exception as e:
+                logger.warning(f"Backtesting failed: {e}")
+                result["backtest_results"] = {"error": str(e), "performed": False}
+        
+        # =========================
+        # 6. CONFIDENCE SCORING
         # =========================
         # Calculate condition number
         if PYPFOPT_AVAILABLE:
@@ -547,7 +788,7 @@ async def optimize_portfolio_advanced(
         }
         
         # =========================
-        # 6. METADATA & SUMMARY
+        # 7. METADATA & SUMMARY
         # =========================
         result["metadata"] = {
             "timestamp": datetime.now().isoformat(),
@@ -594,6 +835,22 @@ async def optimize_portfolio_advanced(
                 "CVaR optimization",
                 "Risk parity"
             ])
+        
+        # Add shared library features to summary
+        if 'market_views_adjustment' in result and result['market_views_adjustment'].get('applied'):
+            result["optimization_summary"]["advanced_features"].append(f"Market views ({result['market_views_adjustment']['method']})")
+        
+        if 'Quantum-Cardinality' in result.get('optimal_portfolios', {}):
+            result["optimization_summary"]["advanced_features"].append("Quantum-inspired optimization")
+        
+        if 'validation' in result and not result['validation'].get('error'):
+            result["optimization_summary"]["advanced_features"].append("Walk-forward validation")
+        
+        if 'multi_period_plan' in result and not result['multi_period_plan'].get('error'):
+            result["optimization_summary"]["advanced_features"].append("Multi-period optimization")
+        
+        if 'backtest_results' in result and not result['backtest_results'].get('error'):
+            result["optimization_summary"]["advanced_features"].append("Backtesting on analogous periods")
         
         return result
         

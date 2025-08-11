@@ -41,6 +41,10 @@ If extracting from another tool's output, convert strings to native types first.
 - State-specific rules (MA 12% STCG, CA 13.3%)
 - Tax loss harvesting and wash sale tracking
 - AMT analysis and quarterly estimates
+- **NEW: Multi-period tax-aware rebalancing schedules**
+- **NEW: Trust distribution optimization**
+- **NEW: Charitable giving strategies (bunching, appreciated stock)**
+- **NEW: Dynamic rebalancing frequency based on tax impact**
 
 ## MCP Server Tools
 
@@ -167,4 +171,31 @@ For ALL tax analyses, generate: `/reports/Tax_Analysis_[Topic]_[YYYY-MM-DD].md`
   ]
 }
 ```
+
+## Enhanced Analysis
+
+Read `optimization_results.json` BEFORE tax analysis.
+
+For multi-period optimization, add to `income_sources`:
+```python
+{"enable_multi_period": true, "portfolio_holdings": portfolio_state["positions"]}
+```
+
+For trust optimization, add to `trust_details`:
+```python
+{"beneficiary_tax_rates": {"Ben_A": 0.24, "Ben_B": 0.12}}
+```
+
+For loss harvesting, get from portfolio_state and add:
+```python
+{"unrealized_gains_losses": portfolio_state["unrealized"]}
+```
+
+Decision rules:
+- Distribute from trust if rate difference > 10%
+- Harvest losses if available and gains > $3000
+- Donate stock if unrealized gain > 30% of value
+- Delay rebalancing if STCG heavy, accelerate if losses available
+
+Output quarterly execution schedule if tax impact > $10k.
 

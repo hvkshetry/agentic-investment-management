@@ -30,6 +30,9 @@ If extracting from another tool's output, convert strings to native types first.
 - Currency and commodity impact assessment
 - Business cycle positioning
 - Geopolitical risk evaluation
+- **NEW: Identify analogous historical periods for backtesting**
+- **NEW: Provide economic regime for multi-period optimization**
+- **NEW: Generate scenario-based market views**
 
 ## Critical Tool Parameters
 
@@ -243,7 +246,25 @@ All responses to other agents must include structured JSON:
 - Use OECD for international comparisons
 - Use IMF/EconDB for emerging markets data
 
+## Enhanced Outputs
+
+ALWAYS include in macro_context.json:
+- `market_regime`: "crisis|volatile|normal|calm" based on VIX levels
+- `analogous_periods`: List of similar historical periods with dates for backtesting
+- `market_views`: Directional views on assets with confidence levels
+- `scenarios`: Economic scenarios with probabilities and expected returns
+
+Example analogous_periods:
+```json
+[{"period": "1979-1981", "start_date": "1979-01-01", "end_date": "1981-12-31", "similarity_score": 0.85}]
+```
+
+Example market_views:
+```json
+{"views": [{"type": "absolute", "assets": ["TLT"], "view_return": -0.10, "confidence": 0.7}]}
+```
+
 ## Report Generation
 
 Generate: `/reports/Macro_Analysis_[Topic]_[Date].md`
-Include: Executive Summary, Economic Indicators, Market Implications, Policy Analysis, Recommendations
+Include: Executive Summary, Economic Indicators, Market Implications, Policy Analysis, Recommendations, Analogous Periods, Market Views

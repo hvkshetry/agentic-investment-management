@@ -370,7 +370,181 @@ async def calculate_comprehensive_tax(
         result["marginal_analysis"] = marginal_impacts
         
         # =========================
-        # 8. TAX PLANNING RECOMMENDATIONS
+        # 8. ADVANCED TAX OPTIMIZATION FROM SHARED LIBRARIES
+        # =========================
+        
+        # 8A. MULTI-PERIOD TAX OPTIMIZATION
+        if trust_details.get('enable_multi_period', False) or income_sources.get('enable_multi_period', False):
+            try:
+                from optimization.multi_period import MultiPeriodOptimizer
+                marginal_rate = get_marginal_rate(agi, filing_status, entity_type, tax_year)
+                mp_optimizer = MultiPeriodOptimizer(
+                    tax_rates={'short_term': marginal_rate/100, 'long_term': get_capital_gains_rate(agi, filing_status, tax_year)/100}
+                )
+                
+                # Analyze tax-aware rebalancing if portfolio provided
+                if 'portfolio_holdings' in trust_details or 'portfolio_holdings' in income_sources:
+                    holdings = trust_details.get('portfolio_holdings') or income_sources.get('portfolio_holdings', {})
+                    target_weights = trust_details.get('target_weights') or income_sources.get('target_weights', {})
+                    current_prices = trust_details.get('current_prices') or income_sources.get('current_prices', {})
+                    cost_basis = trust_details.get('cost_basis') or income_sources.get('cost_basis', {})
+                    
+                    tax_aware_plan = mp_optimizer.tax_aware_rebalance(
+                        current_holdings=holdings,
+                        target_weights=target_weights,
+                        current_prices=current_prices,
+                        cost_basis=cost_basis
+                    )
+                    
+                    result["tax_aware_rebalancing"] = {
+                        "total_tax_due": tax_aware_plan['total_tax_due'],
+                        "loss_harvest_candidates": tax_aware_plan['loss_harvest_candidates'],
+                        "tax_efficiency_score": tax_aware_plan['tax_efficiency_score'],
+                        "recommended_trades": tax_aware_plan.get('trades', {}),
+                        "optimization_performed": True
+                    }
+                    
+            except Exception as e:
+                logger.warning(f"Multi-period tax optimization failed: {e}")
+                result["tax_aware_rebalancing"] = {"error": str(e), "optimization_performed": False}
+        
+        # 8B. TAX LOSS HARVESTING ANALYSIS
+        if income_sources.get('unrealized_gains_losses'):
+            try:
+                from backtesting.strategies import StrategyLibrary
+                
+                unrealized = income_sources['unrealized_gains_losses']
+                marginal_rate = get_marginal_rate(agi, filing_status, entity_type, tax_year)
+                
+                # Identify tax loss harvesting opportunities
+                harvest_opportunities = []
+                total_harvestable_losses = 0
+                
+                for asset, gain_loss in unrealized.items():
+                    if gain_loss < 0:
+                        # Calculate tax benefit of harvesting this loss
+                        if abs(gain_loss) > income_sources.get('short_term_capital_gains', 0):
+                            # Can offset STCG at ordinary rates
+                            tax_benefit = min(abs(gain_loss), income_sources.get('short_term_capital_gains', 0)) * marginal_rate / 100
+                        else:
+                            # Offset LTCG at capital gains rate
+                            tax_benefit = abs(gain_loss) * get_capital_gains_rate(agi, filing_status, tax_year) / 100
+                        
+                        harvest_opportunities.append({
+                            "asset": asset,
+                            "unrealized_loss": gain_loss,
+                            "tax_benefit": tax_benefit,
+                            "wash_sale_warning": "Avoid repurchasing within 30 days"
+                        })
+                        total_harvestable_losses += abs(gain_loss)
+                
+                result["tax_loss_harvesting"] = {
+                    "opportunities": harvest_opportunities,
+                    "total_harvestable_losses": total_harvestable_losses,
+                    "potential_tax_savings": sum(opp['tax_benefit'] for opp in harvest_opportunities),
+                    "current_year_offset_limit": 3000,  # Against ordinary income
+                    "analysis_performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Tax loss harvesting analysis failed: {e}")
+                result["tax_loss_harvesting"] = {"error": str(e), "analysis_performed": False}
+        
+        # 8C. TRUST DISTRIBUTION OPTIMIZATION
+        if entity_type == "trust" and trust_details.get('beneficiary_tax_rates'):
+            try:
+                # Analyze optimal distribution strategy
+                dni = trust_details.get('distributable_net_income', 0)
+                beneficiary_rates = trust_details['beneficiary_tax_rates']
+                marginal_rate = get_marginal_rate(agi, filing_status, entity_type, tax_year)
+                
+                # Calculate tax at trust level vs beneficiary level
+                trust_tax_rate = marginal_rate / 100  # Trust marginal rate (likely 37%)
+                
+                distribution_scenarios = []
+                for beneficiary, ben_rate in beneficiary_rates.items():
+                    tax_at_trust = dni * trust_tax_rate
+                    tax_at_beneficiary = dni * ben_rate
+                    tax_savings = tax_at_trust - tax_at_beneficiary
+                    
+                    distribution_scenarios.append({
+                        "beneficiary": beneficiary,
+                        "beneficiary_rate": ben_rate * 100,
+                        "trust_rate": trust_tax_rate * 100,
+                        "distribution_amount": dni,
+                        "tax_savings": tax_savings,
+                        "recommendation": "Distribute" if tax_savings > 0 else "Retain in trust"
+                    })
+                
+                result["trust_distribution_optimization"] = {
+                    "scenarios": distribution_scenarios,
+                    "optimal_distribution": max(distribution_scenarios, key=lambda x: x['tax_savings']),
+                    "total_potential_savings": sum(s['tax_savings'] for s in distribution_scenarios if s['tax_savings'] > 0),
+                    "analysis_performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Trust distribution optimization failed: {e}")
+                result["trust_distribution_optimization"] = {"error": str(e), "analysis_performed": False}
+        
+        # 8D. CHARITABLE GIVING OPTIMIZATION
+        if deductions.get('charitable_planning'):
+            try:
+                charitable_config = deductions['charitable_planning']
+                
+                # Analyze donation strategies
+                strategies = []
+                
+                # Bunching strategy
+                if charitable_config.get('annual_giving'):
+                    annual = charitable_config['annual_giving']
+                    bunched = annual * 3  # Bundle 3 years
+                    marginal_rate = get_marginal_rate(agi, filing_status, entity_type, tax_year)
+                    
+                    # Calculate tax benefit
+                    current_benefit = min(annual, agi * 0.6) * marginal_rate / 100  # AGI limit
+                    bunched_benefit = min(bunched, agi * 0.6) * marginal_rate / 100
+                    
+                    strategies.append({
+                        "strategy": "Bunching",
+                        "description": "Bundle 3 years of donations in current year",
+                        "current_year_donation": bunched,
+                        "tax_benefit": bunched_benefit,
+                        "vs_annual_benefit": bunched_benefit - (current_benefit * 3),
+                        "recommendation": "Consider if itemizing"
+                    })
+                
+                # Appreciated stock donation
+                if charitable_config.get('appreciated_stock'):
+                    stock_value = charitable_config['appreciated_stock']['value']
+                    stock_basis = charitable_config['appreciated_stock']['basis']
+                    unrealized_gain = stock_value - stock_basis
+                    
+                    # Avoid capital gains tax + get deduction
+                    cap_gains_avoided = unrealized_gain * get_capital_gains_rate(agi, filing_status, tax_year) / 100
+                    deduction_value = stock_value * marginal_rate / 100
+                    
+                    strategies.append({
+                        "strategy": "Donate Appreciated Stock",
+                        "stock_value": stock_value,
+                        "capital_gains_avoided": cap_gains_avoided,
+                        "deduction_value": deduction_value,
+                        "total_benefit": cap_gains_avoided + deduction_value,
+                        "recommendation": "Highly tax-efficient"
+                    })
+                
+                result["charitable_optimization"] = {
+                    "strategies": strategies,
+                    "best_strategy": max(strategies, key=lambda x: x.get('total_benefit', x.get('tax_benefit', 0))),
+                    "analysis_performed": True
+                }
+                
+            except Exception as e:
+                logger.warning(f"Charitable optimization failed: {e}")
+                result["charitable_optimization"] = {"error": str(e), "analysis_performed": False}
+        
+        # =========================
+        # 9. TAX PLANNING RECOMMENDATIONS
         # =========================
         
         recommendations = []
