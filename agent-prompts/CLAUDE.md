@@ -259,6 +259,8 @@ Before accepting ANY agent output:
 6. **Options Income**: Must be <10% annualized yield based on actual chain data
 7. **Tool Names**: Ensure agents use CORRECT MCP tool names (e.g., `mcp__risk-server__` not `mcp__risk-analyzer__`)
 8. **Parameter Types**: OpenBB numeric parameters must be integers not strings (limit: 50 not "50")
+9. **Risk Analysis**: Must have using_portfolio_state=true and cover ALL positions (not subset)
+10. **No Fabrication**: REJECT ANY metrics not in actual tool outputs (no invented liquidity, sectors, etc.)
 
 If validation fails: REJECT output and request agent to use MCP tools properly with correct names and types.
 

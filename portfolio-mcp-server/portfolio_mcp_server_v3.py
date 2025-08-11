@@ -91,6 +91,24 @@ async def optimize_portfolio_advanced(
         Comprehensive optimization results using professional algorithms
     """
     try:
+        # Handle MCP JSON string serialization
+        import json
+        
+        # Convert JSON strings to native types if needed (MCP protocol serializes to JSON)
+        if isinstance(tickers, str):
+            try:
+                tickers = json.loads(tickers)
+                logger.debug(f"Converted tickers from JSON string to list with {len(tickers)} elements")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse tickers as JSON: {tickers[:50]}...")
+        
+        if isinstance(optimization_config, str):
+            try:
+                optimization_config = json.loads(optimization_config)
+                logger.debug("Converted optimization_config from JSON string to dict")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse optimization_config as JSON: {optimization_config[:50]}...")
+        
         # Check if required libraries are available
         if not PYPFOPT_AVAILABLE and not RISKFOLIO_AVAILABLE:
             raise ImportError("Neither PyPortfolioOpt nor Riskfolio-Lib is available. At least one optimization library is required.")

@@ -63,6 +63,31 @@ async def analyze_portfolio_risk(
         Comprehensive risk analysis with all metrics, stress tests, and confidence scores
     """
     try:
+        # Handle MCP JSON string serialization
+        import json
+        
+        # Convert JSON strings to native types if needed (MCP protocol serializes to JSON)
+        if isinstance(tickers, str):
+            try:
+                tickers = json.loads(tickers)
+                logger.debug(f"Converted tickers from JSON string to list with {len(tickers)} elements")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse tickers as JSON: {tickers[:50]}...")
+        
+        if isinstance(weights, str):
+            try:
+                weights = json.loads(weights)
+                logger.debug(f"Converted weights from JSON string to list with {len(weights)} elements")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse weights as JSON: {weights[:50]}...")
+        
+        if isinstance(analysis_options, str):
+            try:
+                analysis_options = json.loads(analysis_options)
+                logger.debug("Converted analysis_options from JSON string to dict")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse analysis_options as JSON: {analysis_options[:50]}...")
+        
         # Parse options with defaults
         options = analysis_options or {}
         lookback_days = options.get('lookback_days', 504)

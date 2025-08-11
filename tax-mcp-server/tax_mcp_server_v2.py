@@ -87,6 +87,38 @@ async def calculate_comprehensive_tax(
         Comprehensive tax analysis with federal, state, NIIT, AMT, and confidence scoring
     """
     try:
+        # Handle MCP JSON string serialization
+        import json
+        
+        # Convert JSON strings to native types if needed (MCP protocol serializes to JSON)
+        if isinstance(income_sources, str):
+            try:
+                income_sources = json.loads(income_sources)
+                logger.debug(f"Converted income_sources from JSON string to dict with {len(income_sources)} keys")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse income_sources as JSON: {income_sources[:50]}...")
+        
+        if isinstance(deductions, str):
+            try:
+                deductions = json.loads(deductions)
+                logger.debug(f"Converted deductions from JSON string to dict with {len(deductions)} keys")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse deductions as JSON: {deductions[:50]}...")
+        
+        if isinstance(credits, str):
+            try:
+                credits = json.loads(credits)
+                logger.debug(f"Converted credits from JSON string to dict with {len(credits)} keys")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse credits as JSON: {credits[:50]}...")
+        
+        if isinstance(trust_details, str):
+            try:
+                trust_details = json.loads(trust_details)
+                logger.debug(f"Converted trust_details from JSON string to dict")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse trust_details as JSON: {trust_details[:50]}...")
+        
         # Default income sources
         if income_sources is None:
             income_sources = {}
