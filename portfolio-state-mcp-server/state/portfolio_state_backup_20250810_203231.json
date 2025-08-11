@@ -894,14 +894,14 @@
   "accounts": {
     "30433360": {
       "broker": "vanguard",
-      "last_import": "2025-08-10T20:35:04.939566",
+      "last_import": "2025-08-10T20:13:44.234569",
       "num_lots_imported": 20
     },
     "NE_55344": {
       "broker": "ubs",
-      "last_import": "2025-08-10T20:37:28.650527",
+      "last_import": "2025-08-10T20:16:11.585885",
       "num_lots_imported": 40
     }
   },
-  "last_updated": "2025-08-10T20:37:28.651019"
+  "last_updated": "2025-08-10T20:16:11.586338"
 }
