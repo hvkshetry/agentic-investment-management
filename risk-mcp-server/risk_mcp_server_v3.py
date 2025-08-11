@@ -39,8 +39,8 @@ portfolio_state_client = get_portfolio_state_client()
 @server.tool()
 async def analyze_portfolio_risk(
     tickers: List[str],
-    weights: Optional[List[float]] = None,
-    analysis_options: Optional[Dict[str, Any]] = None
+    weights: List[float],
+    analysis_options: Dict[str, Any] = {}
 ) -> Dict[str, Any]:
     """
     Comprehensive portfolio risk analysis in a single call.
@@ -48,8 +48,8 @@ async def analyze_portfolio_risk(
     
     Args:
         tickers: List of ticker symbols
-        weights: Portfolio weights (equal weight if not provided)
-        analysis_options: Optional dict to customize analysis:
+        weights: Portfolio weights (REQUIRED - will be normalized to sum to 1.0)
+        analysis_options: Dict to customize analysis (pass empty dict {} for defaults):
             - lookback_days: int (default 504)
             - confidence_levels: List[float] (default [0.90, 0.95, 0.99])
             - time_horizons: List[int] (default [1, 5, 10, 21] days)
@@ -88,8 +88,8 @@ async def analyze_portfolio_risk(
             except (json.JSONDecodeError, TypeError):
                 logger.warning(f"Could not parse analysis_options as JSON: {analysis_options[:50]}...")
         
-        # Parse options with defaults
-        options = analysis_options or {}
+        # Parse options with defaults (analysis_options is now always a dict, never None)
+        options = analysis_options if analysis_options else {}
         lookback_days = options.get('lookback_days', 504)
         confidence_levels = options.get('confidence_levels', [0.90, 0.95, 0.99])
         time_horizons = options.get('time_horizons', [1, 5, 10, 21])
@@ -132,13 +132,10 @@ async def analyze_portfolio_risk(
         returns = data['returns'].values
         prices = data['prices'].values
         
-        # Default to equal weights if not provided
-        if actual_weights is None:
-            actual_weights = np.ones(len(actual_tickers)) / len(actual_tickers)
-        else:
-            actual_weights = np.array(actual_weights)
-            # Normalize weights
-            actual_weights = actual_weights / np.sum(actual_weights)
+        # Convert to numpy array and normalize weights
+        actual_weights = np.array(actual_weights)
+        # Normalize weights to ensure they sum to 1.0
+        actual_weights = actual_weights / np.sum(actual_weights)
         
         # Update variables for consistency
         tickers = actual_tickers

@@ -62,7 +62,7 @@ except ImportError:
 @server.tool()
 async def optimize_portfolio_advanced(
     tickers: List[str],
-    optimization_config: Optional[Dict[str, Any]] = None
+    optimization_config: Dict[str, Any] = {}
 ) -> Dict[str, Any]:
     """
     Professional-grade portfolio optimization using Riskfolio-Lib and PyPortfolioOpt.
@@ -70,7 +70,7 @@ async def optimize_portfolio_advanced(
     
     Args:
         tickers: List of ticker symbols
-        optimization_config: Configuration dict with options:
+        optimization_config: Configuration dict with options (pass {} for defaults):
             - lookback_days: int (default 756 for 3 years)
             - portfolio_value: float (default 1000000)
             - risk_measure: str (default 'MV' for variance)
@@ -113,8 +113,8 @@ async def optimize_portfolio_advanced(
         if not PYPFOPT_AVAILABLE and not RISKFOLIO_AVAILABLE:
             raise ImportError("Neither PyPortfolioOpt nor Riskfolio-Lib is available. At least one optimization library is required.")
         
-        # Parse configuration
-        config = optimization_config or {}
+        # Parse configuration (optimization_config is now always a dict, never None)
+        config = optimization_config if optimization_config else {}
         lookback_days = config.get('lookback_days', 756)  # 3 years
         portfolio_value = config.get('portfolio_value', 1000000)
         risk_measure = config.get('risk_measure', 'MV')

@@ -38,14 +38,14 @@ async def calculate_comprehensive_tax(
     tax_year: int = 2024,
     entity_type: str = "individual",  # 'individual', 'trust', 'estate'
     filing_status: str = "Single",
-    state: Optional[str] = None,
-    income_sources: Dict[str, float] = None,
-    deductions: Dict[str, float] = None,
-    credits: Dict[str, float] = None,
+    state: str = "",  # Empty string for no state tax
+    income_sources: Dict[str, float] = {},
+    deductions: Dict[str, float] = {},
+    credits: Dict[str, float] = {},
     dependents: int = 0,
     include_niit: bool = True,
     include_amt: bool = True,
-    trust_details: Optional[Dict[str, Any]] = None
+    trust_details: Dict[str, Any] = {}
 ) -> Dict[str, Any]:
     """
     Comprehensive tax calculation including NIIT, trust taxes, and state-specific rules.
@@ -55,7 +55,7 @@ async def calculate_comprehensive_tax(
         tax_year: Tax year (2018-2024)
         entity_type: 'individual', 'trust', or 'estate'
         filing_status: For individuals: 'Single', 'Married Filing Jointly', etc.
-        state: Two-letter state code (e.g., 'MA', 'CA', 'NY')
+        state: Two-letter state code (e.g., 'MA', 'CA', 'NY') or empty string for no state tax
         income_sources: Dict with income types:
             - w2_income: Wages and salaries
             - taxable_interest: Interest income
@@ -119,15 +119,8 @@ async def calculate_comprehensive_tax(
             except (json.JSONDecodeError, TypeError):
                 logger.warning(f"Could not parse trust_details as JSON: {trust_details[:50]}...")
         
-        # Default income sources
-        if income_sources is None:
-            income_sources = {}
-        
-        if deductions is None:
-            deductions = {}
-        
-        if credits is None:
-            credits = {}
+        # Ensure dicts are not None (though they shouldn't be with new defaults)
+        # These checks are now redundant but kept for safety
         
         # Try to get real capital gains from Portfolio State
         use_portfolio_state = income_sources.get('use_portfolio_state', True)

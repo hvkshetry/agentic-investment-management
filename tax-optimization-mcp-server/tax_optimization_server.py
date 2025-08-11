@@ -198,8 +198,8 @@ def convert_portfolio_state_to_oracle_format(portfolio_state, current_prices=Non
 async def optimize_portfolio_for_taxes(
     ctx: Context,
     optimization_goal: str = "tax_aware_rebalance",
-    target_allocations: Optional[Dict[str, float]] = None,
-    optimization_settings: Optional[Dict[str, Any]] = None,
+    target_allocations: Dict[str, float] = {},
+    optimization_settings: Dict[str, Any] = {},
     withdrawal_amount: float = 0.0
 ) -> Dict[str, Any]:
     """
@@ -212,8 +212,8 @@ async def optimize_portfolio_for_taxes(
             - "direct_index": Direct indexing strategy
             - "minimize_taxes": Minimize tax impact
             - "withdrawal": Optimize withdrawal for taxes
-        target_allocations: Optional target weights by symbol
-        optimization_settings: Oracle optimization parameters
+        target_allocations: Target weights by symbol (pass {} for defaults)
+        optimization_settings: Oracle optimization parameters (pass {} for defaults)
         withdrawal_amount: Amount to withdraw (if any)
     
     Returns:

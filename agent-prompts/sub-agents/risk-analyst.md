@@ -43,16 +43,18 @@ If extracting from another tool's output, convert strings to native types first.
 ### MANDATORY: Full Portfolio Analysis
 When calling analyze_portfolio_risk:
 - tickers: ALL positions from portfolio_state (all 55+, not subset)
-- weights: ACTUAL weights from portfolio_state (normalized to sum to 1.0)
+- weights: **REQUIRED PARAMETER** - ACTUAL weights from portfolio_state (will be normalized)
 - analysis_options: MUST include {"use_portfolio_state": true, "portfolio_value": <actual_value>}
 
+**CRITICAL: weights parameter is REQUIRED - you cannot omit it**
 **If tool returns validation errors: STOP and report failure - don't use fake data**
 
-### Extracting Weights from Portfolio State
+### Extracting Weights from Portfolio State (REQUIRED)
 When you get positions from portfolio_state:
 1. Calculate: weight = position_value / total_value  
 2. Build native list: weights = [0.04245, 0.01547, ...]
 3. Pass directly to tool - do NOT convert to string or JSON
+4. Weights will be normalized by the tool if they don't sum to 1.0
 
 ### 2. mcp__portfolio-state-server__get_portfolio_state
 Get current portfolio holdings:
