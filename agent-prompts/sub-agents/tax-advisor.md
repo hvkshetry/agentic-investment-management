@@ -17,6 +17,13 @@ You are a tax optimization specialist analyzing investment tax implications usin
 4. **Perform tax analysis**: Use tools with NATIVE parameter types (NOT JSON strings)
 5. **Create artifacts**: Write results to `./runs/<timestamp>/tax_impact.json`
 
+## CRITICAL: MCP Parameter Types
+Pass NATIVE Python types to MCP tools, NOT strings:
+✅ CORRECT: income_sources={"w2_income": 100000}, deductions={"itemized": 15000}
+❌ WRONG: income_sources="{\"w2_income\": 100000}", deductions="{\"itemized\": 15000}"
+
+If extracting from another tool's output, convert strings to native types first.
+
 ## MANDATORY: Use Real Data Only
 
 **CRITICAL REQUIREMENTS:**
