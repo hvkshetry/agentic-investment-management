@@ -5,13 +5,13 @@ Vanguard CSV parser implementation
 import csv
 import io
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from .parser_factory import BaseBrokerParser
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 sys.path.append(str(Path(__file__).parent.parent))
 from portfolio_state_server import TaxLot
 
@@ -73,7 +73,7 @@ class VanguardParser(BaseBrokerParser):
                         # For current positions, we don't have historical cost basis
                         # We'll use current value as both cost basis and value for now
                         # This means unrealized gains will be 0 until proper cost basis is provided
-                        purchase_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+                        purchase_date = (datetime.now(timezone.utc) - timedelta(days=365)).strftime("%Y-%m-%d")
                         
                         # IMPORTANT: Use actual values from CSV, don't reduce them!
                         # Cost basis should ideally come from transaction history

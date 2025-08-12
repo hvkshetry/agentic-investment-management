@@ -6,11 +6,16 @@ Manages structured artifacts with lineage tracking
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from enum import Enum
 import logging
+import sys
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+from shared.atomic_writer import atomic_dump_json, atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +43,14 @@ class ArtifactStore:
         
     def start_run(self) -> str:
         """Start a new run and create its directory"""
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         self.current_run_path = self.base_path / timestamp
         self.current_run_path.mkdir(parents=True, exist_ok=True)
         
         # Initialize run index
         self.index = {
             "run_id": timestamp,
-            "started_at": datetime.now().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat(),
             "artifacts": []
         }
         
@@ -69,7 +74,7 @@ class ArtifactStore:
             "id": str(uuid.uuid4()),
             "kind": kind.value,
             "schema_version": "1.0.0",
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "created_by": created_by,
             "depends_on": depends_on or [],
             "confidence": confidence,
@@ -78,8 +83,7 @@ class ArtifactStore:
         
         # Store artifact
         artifact_path = self.current_run_path / f"{artifact['id']}.json"
-        with open(artifact_path, 'w') as f:
-            json.dump(artifact, f, indent=2, default=str)
+        atomic_dump_json(artifact, artifact_path)
             
         # Update index
         self.index["artifacts"].append({
@@ -130,8 +134,7 @@ class ArtifactStore:
         """Save the current run index"""
         if self.current_run_path:
             index_path = self.current_run_path / "index.json"
-            with open(index_path, 'w') as f:
-                json.dump(self.index, f, indent=2, default=str)
+            atomic_dump_json(self.index, index_path)
                 
     def create_decision_memo(
         self,
@@ -192,7 +195,7 @@ class ArtifactStore:
         if not self.current_run_path:
             self.start_run()
             
-        timestamp = datetime.now().strftime("%Y-%m-%d")
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         filename = f"{report_type}_{title}_{timestamp}.md"
         
         # Save to both runs directory and reports directory
@@ -200,7 +203,6 @@ class ArtifactStore:
             directory.mkdir(parents=True, exist_ok=True)
             report_path = directory / filename
             
-            with open(report_path, 'w') as f:
-                f.write(content)
+            atomic_write_text(content, report_path)
                 
         logger.info(f"Generated report: {filename}")

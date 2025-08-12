@@ -1,4 +1,4 @@
-# OpenBB MCP Curated Tools - Parameter Guide
+# OpenBB MCP Curated Tools - Parameter Guide (43 Tools)
 
 ## Tools Requiring Date Parameters
 
@@ -153,4 +153,61 @@ The following tools have been removed as they are deprecated or redundant:
 4. When a tool fails with a provider, try alternative providers listed above
 5. For risk premium calculations, use economy_fred_series to get component rates and calculate spreads manually
 6. For trade analysis, use bilateral flows to track specific trade relationships
-7. Monitor port volumes as leading indicators of trade disruptions
+7. Monitor port volumes as leading indicators of trade disruptions## Complete List of 43 Curated Tools
+
+### Economy (5 tools)
+- economy_cpi
+- economy_gdp_nominal
+- economy_gdp_real
+- economy_interest_rates
+- economy_unemployment
+
+### Equity (19 tools)
+- equity_compare_company_facts
+- equity_discovery_filings
+- equity_estimates_consensus (yfinance - FREE)
+- equity_fundamental_balance
+- equity_fundamental_cash
+- equity_fundamental_dividends
+- equity_fundamental_income
+- equity_fundamental_management_discussion_analysis
+- equity_fundamental_metrics
+- equity_fundamental_multiples
+- equity_ownership_form_13f
+- equity_ownership_insider_trading
+- equity_price_historical
+- equity_price_performance
+- equity_profile
+- equity_shorts_fails_to_deliver (SEC - FREE)
+- equity_shorts_short_interest (FINRA - FREE)
+- equity_shorts_short_volume (Stockgrid - FREE)
+
+### Fixed Income (4 tools)
+- fixedincome_government_treasury_rates
+- fixedincome_government_yield_curve
+- fixedincome_spreads_tcm
+- fixedincome_spreads_treasury_effr
+
+### ETF (3 tools)
+- etf_equity_exposure
+- etf_holdings
+- etf_sectors
+
+### Derivatives (2 tools)
+- derivatives_futures_curve
+- derivatives_options_chains
+
+### SEC/Regulators (6 tools)
+- regulators_sec_cik_map
+- regulators_sec_filing_headers
+- regulators_sec_htm_file
+- regulators_sec_institutions_search
+- regulators_sec_rss_litigation
+- regulators_sec_symbol_map
+
+### Other Markets (4 tools)
+- commodity_price_spot
+- crypto_price_historical
+- currency_price_historical
+- index_price_historical
+- news_company

@@ -9,14 +9,15 @@ from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
 from scipy import stats
 import logging
+import sys
+from pathlib import Path
 
-# Configure logging to stderr only (critical for stdio transport)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]  # Defaults to stderr
-)
-logger = logging.getLogger("risk-server")
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+from shared.logging_utils import get_library_logger
+
+# Get logger without side effects
+logger = get_library_logger(__name__)
 
 # Initialize FastMCP server
 server = FastMCP("Risk Analyzer")
@@ -401,6 +402,10 @@ async def calculate_component_var(
         raise ValueError(f"Component VaR calculation failed: {str(e)}")
 
 if __name__ == "__main__":
+    # Configure logging for standalone execution
+    from shared.logging_utils import setup_mcp_server_logging
+    logger = setup_mcp_server_logging("risk-server")
+    
     # Run the server with stdio transport
     logger.info("Starting Risk MCP Server v2.0 with FastMCP")
     server.run(transport="stdio")

@@ -5,7 +5,7 @@ UBS CSV parser implementation
 import csv
 import io
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import re
 
@@ -131,7 +131,7 @@ class UBSParser(BaseBrokerParser):
                         # Small gain/loss - likely recent purchase
                         days_ago = 90
                     
-                    purchase_date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+                    purchase_date = (datetime.now(timezone.utc) - timedelta(days=days_ago)).strftime("%Y-%m-%d")
                     
                     # Get description for asset type
                     description = row.get('DESCRIPTION', '')

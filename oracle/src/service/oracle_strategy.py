@@ -408,9 +408,9 @@ class OracleStrategy:
                     constraint_value = pulp.value(constraint)
                     # Log constraint value at debug level
                     logger.debug(f"Constraint {name}: {constraint} -> Value: {constraint_value}") 
-                except:
+                except Exception as e:
                     # logger.warning if constraint evaluation fails
-                    logger.warning(f"Could not evaluate constraint {name}: {constraint}")
+                    logger.warning(f"Could not evaluate constraint {name}: {constraint}. Error: {e}")
         
         if status != pulp.LpStatusOptimal:
             # Use logger.warning for non-optimal solutions

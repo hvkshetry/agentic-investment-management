@@ -1,7 +1,7 @@
 ---
 name: etf-analyst
 description: ETF analysis and selection specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__etf_search, mcp__openbb-curated__etf_historical, mcp__openbb-curated__etf_info, mcp__openbb-curated__etf_sectors, mcp__openbb-curated__etf_countries, mcp__openbb-curated__etf_price_performance, mcp__openbb-curated__etf_holdings, mcp__openbb-curated__etf_equity_exposure, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__etf_sectors, mcp__openbb-curated__etf_holdings, mcp__openbb-curated__etf_equity_exposure, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -33,22 +33,19 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 
 **CORRECT - Integers without quotes:**
 ```python
-mcp__openbb-curated__etf_search(query="technology", limit=50)
-mcp__openbb-curated__etf_historical(symbol="QQQ", start_date="2024-01-01")
+mcp__openbb-curated__etf_holdings(symbol="QQQ", limit=50)
+mcp__openbb-curated__etf_equity_exposure(symbol="XLK", limit=100)
 ```
 
 **WRONG - Never use quotes for numbers:**
 ```python
-mcp__openbb-curated__etf_search(limit="50")  # ❌ FAILS
+mcp__openbb-curated__etf_holdings(limit="50")  # ❌ FAILS
 ```
 
-**Always use these providers:**
-- `etf_historical`: provider="yfinance"
-- `etf_info`: provider="yfinance"
+**Available ETF tools:**
 - `etf_holdings`: provider="sec" (large ETFs may have extensive output)
+- `etf_sectors`: Sector breakdown of ETF holdings
 - `etf_equity_exposure`: provider="fmp" (use sector ETFs only, not SPY/VTI)
-- `etf_search`: provider="fmp"
-- `etf_price_performance`: provider="fmp"
 
 ## Core Capabilities
 

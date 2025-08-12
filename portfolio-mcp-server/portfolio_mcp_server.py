@@ -236,8 +236,8 @@ async def generate_efficient_frontier(
                         "actual_return": min_var_result["expected_return"],
                         "volatility": min_var_result["volatility"]
                     }]
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to append min_var result: {e}")
         
         # Return as a dictionary to match other tools' return format
         return {

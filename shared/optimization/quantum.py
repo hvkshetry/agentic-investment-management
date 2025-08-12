@@ -48,8 +48,11 @@ class QuantumOptimizer:
                 from dwave.cloud import Client
                 client = Client.from_config()
                 self.sampler = client.get_solver()
-            except:
-                logger.info("Quantum hardware not available, using simulated annealing")
+            except ImportError as e:
+                logger.info(f"Quantum library not installed: {e}. Using simulated annealing")
+                self.use_quantum = False
+            except Exception as e:
+                logger.info(f"Quantum hardware not available: {e}. Using simulated annealing")
                 self.use_quantum = False
     
     def optimize_portfolio_selection(self,

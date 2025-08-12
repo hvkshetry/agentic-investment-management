@@ -13,12 +13,12 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 ## Available Specialist Agents
 
 ### 1. **Equity Research Analyst**
-**Capabilities:** Fundamental analysis, financial statements, valuation metrics, insider trading, price analysis
-**Use For:** Stock analysis, sector comparisons, earnings assessment, equity risk evaluation
+**Capabilities:** Fundamental analysis, financial statements, valuation metrics, insider trading, price analysis, congressional trade tracking
+**Use For:** Stock analysis, sector comparisons, earnings assessment, equity risk evaluation, following smart money trades
 
 ### 2. **Macro Analyst** (Economic Indicators)
-**Capabilities:** GDP, CPI, unemployment, FRED data, currency analysis, commodity prices
-**Use For:** Economic cycle analysis, rate environment, inflation impact, market timing
+**Capabilities:** GDP, CPI, unemployment, FRED data, currency analysis, commodity prices, Fed nomination tracking, monetary policy hearings
+**Use For:** Economic cycle analysis, rate environment, inflation impact, market timing, policy regime changes
 
 ### 3. **Fixed Income Analyst**
 **Capabilities:** Treasury yields, yield curve, SOFR/EFFR rates, duration risk, credit spreads
@@ -29,17 +29,17 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 **Use For:** Core portfolio construction, sector rotation, diversification, tactical allocation
 
 ### 5. **Derivatives Options Analyst**
-**Capabilities:** Options chains, implied volatility, Greeks analysis, futures curves
-**Use For:** Hedging strategies, income generation, volatility trading, risk overlays
+**Capabilities:** Options chains, implied volatility, Greeks analysis, futures curves, binary event identification from proposed rules
+**Use For:** Hedging strategies, income generation, volatility trading, risk overlays, regulatory event plays
 
 ### 6. **Market Scanner**
-**Capabilities:** News analysis, market sentiment, overnight developments
-**Use For:** Daily market updates, breaking news, sentiment shifts
+**Capabilities:** News analysis, market sentiment, overnight developments, material bill tracking, key hearing monitoring, federal rule watching
+**Use For:** Daily market updates, breaking news, sentiment shifts, regulatory pipeline awareness
 
 ### 7. **Risk Analyst**
 **MCP Tools:** `mcp__risk-server__analyze_portfolio_risk`, `mcp__portfolio-state-server__get_portfolio_state`
-**Capabilities:** Multiple VaR methods, Ledoit-Wolf shrinkage, component risk, stress testing
-**Use For:** Portfolio risk assessment, stress testing, risk attribution, hedging design
+**Capabilities:** Multiple VaR methods, Ledoit-Wolf shrinkage, component risk, stress testing, regulatory compliance monitoring
+**Use For:** Portfolio risk assessment, stress testing, risk attribution, hedging design, final rule implementation tracking
 
 ### 8. **Portfolio Manager**
 **MCP Tool:** `mcp__portfolio-optimization-server__optimize_portfolio_advanced` (handles all optimization methods)
@@ -48,8 +48,8 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 
 ### 9. **Tax Advisor**
 **MCP Tools:** `mcp__tax-server__calculate_comprehensive_tax`, `mcp__tax-optimization-server__find_tax_loss_harvesting_pairs`, `mcp__portfolio-state-server__simulate_sale`
-**Capabilities:** Federal/state taxes, NIIT, trust tax, MA/CA specifics, loss harvesting
-**Use For:** Tax impact analysis, harvesting strategies, quarterly estimates
+**Capabilities:** Federal/state taxes, NIIT, trust tax, MA/CA specifics, loss harvesting, tax reform bill tracking
+**Use For:** Tax impact analysis, harvesting strategies, quarterly estimates, Ways & Means committee monitoring
 
 ## MANDATORY: Use Sequential Thinking
 
@@ -203,25 +203,64 @@ mcp__portfolio-state-server__get_portfolio_state()
 - **Safe**: Can't accidentally accumulate duplicate positions
 - **Clear**: Server restart = fresh portfolio state
 
-## CRITICAL: OpenBB Tool Parameters
+## CRITICAL: OpenBB Tool Parameters (43 Curated Tools)
 
-**MUST follow these parameter requirements to avoid failures:**
+**OpenBB MCP Server has 43 carefully curated tools** (reduced from 65+ for context efficiency).
 
-### Date-Required Tools (will fail without dates):
-- `economy_balance_of_payments`: Always include `start_date`
-- `fixedincome_government_treasury_rates`: Include `start_date` and `end_date`
+### Key Provider Requirements:
+- **Equity estimates**: Use `provider="yfinance"` for FREE consensus data
+- **Equity fundamentals**: Use `provider="yfinance"` (free)
+- **Equity ownership**: Use `provider="sec"` (free, official)
+- **Equity shorts**: 
+  - `fails_to_deliver`: SEC (free)
+  - `short_interest`: FINRA (free, no API key)
+  - `short_volume`: Stockgrid (free, no API key)
+- **Fixed income**: Use `provider="federal_reserve"` (free)
+- **News**: Use `limit=20` with `provider="yfinance"`
 
-### Provider Recommendations:
-- Economy tools: Use `provider="oecd"` or `provider="fred"`
-- Equity fundamentals: Use `provider="yfinance"`
-- Fixed income: Use `provider="federal_reserve"`
-
-### FRED Series (use with economy_fred_series):
-- Interest rates: DGS2, DGS10, FEDFUNDS, SOFR
-- Economic: GDP, CPIAUCSL, UNRATE, PAYEMS
-- Market: VIXCLS, T10Y2Y
+### MD&A and SEC Tools:
+- `equity_fundamental_management_discussion_analysis`: SEC MD&A extraction
+- `regulators_sec_filing_headers`: Fast form classification
+- `regulators_sec_htm_file`: Source HTML for LLM parsing
+- `equity_compare_company_facts`: XBRL company facts
 
 **See `/openbb-mcp-customizations/OPENBB_TOOL_PARAMETERS.md` for complete guidance**
+
+## SEC/EDGAR Tools for Authoritative Data
+
+**SEC Tools Available:**
+
+### Filing Access & Analysis:
+- `regulators_sec_filing_headers`: Fast form classification without full download
+- `regulators_sec_htm_file`: Source HTML for LLM parsing
+- `regulators_sec_rss_litigation`: Enforcement & litigation feed
+- `equity_discovery_filings`: Ticker-first filing discovery (FMP)
+
+### Mapping & Lookup:
+- `regulators_sec_cik_map`: CIK to ticker mapping
+- `regulators_sec_symbol_map`: Ticker to CIK mapping
+- `regulators_sec_institutions_search`: Find institutional CIKs
+
+### Ownership & Trading:
+- `equity_ownership_form_13f`: 13F holdings (use provider='sec')
+- `equity_ownership_insider_trading`: Form 4 insider trades (use provider='sec')
+
+### Market Frictions (All FREE):
+- `equity_shorts_fails_to_deliver`: FTD data from SEC (free)
+- `equity_shorts_short_interest`: Short interest from FINRA (free, no API key)
+- `equity_shorts_short_volume`: Daily volume from Stockgrid (free, no API key)
+
+### Fundamentals & Analysis:
+- `equity_compare_company_facts`: XBRL company facts from SEC
+- `equity_fundamental_management_discussion_analysis`: MD&A extraction from SEC
+- `equity_estimates_consensus`: Analyst consensus from yfinance (FREE)
+
+**Best Practices:**
+- Use SEC tools for authoritative filings and regulatory data
+- Prefer `provider='sec'` for ownership data (free and official)
+- FTD/shorts data useful for Risk Analyst assessments
+- XBRL facts provide vendor-neutral fundamentals
+
 
 ## Multi-Agent Validation
 

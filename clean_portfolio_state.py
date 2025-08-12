@@ -6,6 +6,11 @@ Makes the portfolio state production-ready with only immutable historical data
 
 import json
 from pathlib import Path
+import sys
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent))
+from shared.atomic_writer import atomic_dump_json
 
 def clean_portfolio_state():
     """Remove test data and dynamic fields from portfolio state"""
@@ -61,8 +66,7 @@ def clean_portfolio_state():
         print("Removed current_prices object")
     
     # Save cleaned state
-    with open(state_file, 'w') as f:
-        json.dump(state, f, indent=2)
+    atomic_dump_json(state, state_file)
     
     print(f"\nCleaning complete:")
     print(f"- Removed {len(removed_tickers)} mock tickers: {removed_tickers}")

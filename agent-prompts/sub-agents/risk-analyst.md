@@ -1,7 +1,7 @@
 ---
 name: risk-analyst
 description: Risk measurement and hedging strategy specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__risk-server__analyze_portfolio_risk, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__risk-server__analyze_portfolio_risk, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__policy-events-service__watch_federal_rules, mcp__policy-events-service__track_material_bills, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -37,6 +37,10 @@ If extracting from another tool's output, convert strings to native types first.
 - Component VaR and risk decomposition
 - Student-t distributions for fat tails
 - Options-based hedging strategies
+- Short interest analysis (FINRA - free, no API key)
+- Short volume monitoring (Stockgrid - free, no API key)
+- FTD analysis for squeeze risk assessment (SEC - free)
+- Market friction monitoring via comprehensive shorts data
 
 ## MCP Server Tools
 
@@ -125,6 +129,18 @@ Standard scenarios applied:
   }
 }
 ```
+
+## Regulatory Risk Monitoring
+
+**Final Rules:** `mcp__policy-events-service__watch_federal_rules`
+- rule_type="final" for compliance requirements
+- Check effective_date for implementation timeline
+- affected_industries maps to portfolio sectors
+
+**Material Bills:** `mcp__policy-events-service__track_material_bills`
+- min_materiality=7 for systemic risk changes
+- status="ENACTED" = immediate implementation
+- committees=["banking", "finance"] for financial regulation
 
 ## Report Generation
 

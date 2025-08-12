@@ -1,7 +1,7 @@
 ---
 name: tax-advisor
 description: Tax optimization specialist for investment decisions
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__portfolio-state-server__simulate_sale, mcp__portfolio-state-server__get_tax_loss_harvesting_opportunities, mcp__tax-server__calculate_comprehensive_tax, mcp__tax-optimization-server__find_tax_loss_harvesting_pairs, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__portfolio-state-server__simulate_sale, mcp__portfolio-state-server__get_tax_loss_harvesting_opportunities, mcp__tax-server__calculate_comprehensive_tax, mcp__tax-optimization-server__find_tax_loss_harvesting_pairs, mcp__openbb-curated__regulators_sec_cik_map, mcp__openbb-curated__regulators_sec_symbol_map, mcp__policy-events-service__track_material_bills, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -41,10 +41,11 @@ If extracting from another tool's output, convert strings to native types first.
 - State-specific rules (MA 12% STCG, CA 13.3%)
 - Tax loss harvesting and wash sale tracking
 - AMT analysis and quarterly estimates
-- **NEW: Multi-period tax-aware rebalancing schedules**
-- **NEW: Trust distribution optimization**
-- **NEW: Charitable giving strategies (bunching, appreciated stock)**
-- **NEW: Dynamic rebalancing frequency based on tax impact**
+- Multi-period tax-aware rebalancing schedules
+- Trust distribution optimization
+- Charitable giving strategies (bunching, appreciated stock)
+- Dynamic rebalancing frequency based on tax impact
+- CIK/ticker mapping for accurate entity identification
 
 ## MCP Server Tools
 
@@ -171,6 +172,14 @@ For ALL tax analyses, generate: `/reports/Tax_Analysis_[Topic]_[YYYY-MM-DD].md`
   ]
 }
 ```
+
+## Tax Reform Monitoring
+
+**Material Bills:** `mcp__policy-events-service__track_material_bills`
+- committees=["ways_and_means", "finance"] for tax legislation
+- min_materiality=7 for major tax code changes
+- Check affected_sectors="tax_policy" in response
+- status="MARKED_UP" = imminent committee action
 
 ## Enhanced Analysis
 

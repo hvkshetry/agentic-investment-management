@@ -8,16 +8,19 @@ Replaces synthetic data injection pattern
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Tuple, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from scipy import stats
 import warnings
+import sys
+from pathlib import Path
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+from shared.logging_utils import get_library_logger
+
+# Get logger without side effects
+logger = get_library_logger(__name__)
 logger = logging.getLogger("data_pipeline")
 
 class DataQualityScorer:
@@ -203,7 +206,7 @@ class MarketDataPipeline:
         """Check if cached data is still valid"""
         if not cache_entry:
             return False
-        return datetime.now() - cache_entry['timestamp'] < self.cache_ttl
+        return datetime.now(timezone.utc) - cache_entry['timestamp'] < self.cache_ttl
     
     def resolve_ticker(self, ticker: str) -> Optional[str]:
         """
@@ -271,9 +274,9 @@ class MarketDataPipeline:
         """
         # Default dates
         if not end_date:
-            end_date = datetime.now().strftime('%Y-%m-%d')
+            end_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
         if not start_date:
-            start_date = (datetime.now() - timedelta(days=504)).strftime('%Y-%m-%d')  # 2 years
+            start_date = (datetime.now(timezone.utc) - timedelta(days=504)).strftime('%Y-%m-%d')  # 2 years
         
         # Resolve ticker aliases for Yahoo Finance compatibility
         original_tickers = tickers.copy()
@@ -309,7 +312,7 @@ class MarketDataPipeline:
         
         # Try Portfolio State Server for current prices (if client provided and fetching recent data)
         portfolio_prices = {}
-        if self.portfolio_state_client and end_date == datetime.now().strftime('%Y-%m-%d'):
+        if self.portfolio_state_client and end_date == datetime.now(timezone.utc).strftime('%Y-%m-%d'):
             try:
                 logger.info("Checking Portfolio State Server for current prices...")
                 # Use asyncio to call async method if needed
@@ -469,7 +472,7 @@ class MarketDataPipeline:
                     'end_date': end_date,
                     'interval': interval,
                     'source': 'OpenBB' if self.use_openbb else 'yfinance',
-                    'fetch_time': datetime.now().isoformat()
+                    'fetch_time': datetime.now(timezone.utc).isoformat()
                 },
                 'quality': quality_report,
                 'statistics': {
@@ -483,7 +486,7 @@ class MarketDataPipeline:
             # Cache the result locally
             self.cache[cache_key] = {
                 'data': result,
-                'timestamp': datetime.now()
+                'timestamp': datetime.now(timezone.utc)
             }
             
             # Also save current prices to shared cache
@@ -544,7 +547,7 @@ class MarketDataPipeline:
                     logger.info(f"Fetching treasury rates from OpenBB for {maturity} rate")
                     
                     # Get date range
-                    end_date = datetime.now()
+                    end_date = datetime.now(timezone.utc)
                     start_date = end_date - timedelta(days=30)  # Get last month's data
                     
                     # Try Federal Reserve provider (the correct name, not 'fred')
@@ -631,7 +634,7 @@ class MarketDataPipeline:
                 'maturity': maturity,
                 'source': 'OpenBB/FRED' if self.use_openbb else 'market_estimate',
                 'confidence': confidence,
-                'fetch_time': datetime.now().isoformat()
+                'fetch_time': datetime.now(timezone.utc).isoformat()
             }
             
             return result
@@ -651,7 +654,7 @@ class MarketDataPipeline:
         Returns:
             Dictionary with index data and statistics
         """
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=lookback_days * 1.5)  # Extra buffer for trading days
         
         result = self.fetch_equity_data(
@@ -698,7 +701,7 @@ class MarketDataPipeline:
         # Fetch raw data
         data = self.fetch_equity_data(
             tickers=tickers,
-            start_date=(datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+            start_date=(datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
         )
         
         returns = data['returns']
@@ -752,7 +755,7 @@ class MarketDataPipeline:
         # Fetch raw data
         data = self.fetch_equity_data(
             tickers=tickers,
-            start_date=(datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+            start_date=(datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
         )
         
         # Add benchmark data if not present
@@ -760,7 +763,7 @@ class MarketDataPipeline:
             try:
                 benchmark_data = self.fetch_equity_data(
                     tickers=['SPY'],  # Use S&P 500 as default benchmark
-                    start_date=(datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+                    start_date=(datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
                 )
                 data['benchmark_returns'] = benchmark_data['returns']['SPY']
             except Exception as e:

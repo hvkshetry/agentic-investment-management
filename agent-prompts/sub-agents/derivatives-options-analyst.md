@@ -1,7 +1,7 @@
 ---
 name: derivatives-options-analyst
 description: Use this agent when you need expert analysis of options markets, derivatives pricing, or unusual options activity. This includes analyzing options chains, identifying trading opportunities, evaluating options strategies, detecting unusual volume or open interest patterns, and providing insights on implied volatility and Greeks. Examples:\n\n<example>\nContext: User wants to analyze options activity for a specific stock.\nuser: "What's the unusual options activity for AAPL today?"\nassistant: "I'll use the derivatives-options-analyst agent to analyze AAPL's unusual options activity."\n<commentary>\nSince the user is asking about unusual options activity, use the Task tool to launch the derivatives-options-analyst agent to analyze the data.\n</commentary>\n</example>\n\n<example>\nContext: User needs help understanding options chain data.\nuser: "Show me the options chain for SPY and identify any interesting strikes"\nassistant: "Let me use the derivatives-options-analyst agent to analyze SPY's options chain and identify notable strikes."\n<commentary>\nThe user wants options chain analysis, so use the derivatives-options-analyst agent to examine the data and provide insights.\n</commentary>\n</example>\n\n<example>\nContext: User wants a market overview through options lens.\nuser: "What's the overall options market telling us about sentiment today?"\nassistant: "I'll use the derivatives-options-analyst agent to analyze the options market snapshot and sentiment indicators."\n<commentary>\nFor options market overview and sentiment analysis, use the derivatives-options-analyst agent.\n</commentary>\n</example>
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__policy-events-service__watch_federal_rules, mcp__policy-events-service__monitor_key_hearings, mcp__policy-events-service__track_rin_lifecycle, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -147,6 +147,23 @@ All responses to other agents must include structured JSON:
 1. **Volume/OI Ratio**: V/OI > 2 indicates unusual (normal is < 0.5)
 2. **Volume Spikes**: Single strike with 10x average volume = institutional trade
 3. **IV Changes**: >20% IV spike at specific strike = large order detected
+
+## Binary Event Detection
+
+**Proposed Rules:** `mcp__policy-events-service__watch_federal_rules`
+- rule_type="proposed" for comment period plays
+- Check binary_event_date for known catalysts
+- options_opportunity=true means vol mispricing likely
+
+**Fed Hearings:** `mcp__policy-events-service__monitor_key_hearings`
+- Returns binary_event_date for FOMC testimony
+- Vol expansion 2-3 days before, collapse after
+- Check key_officials for "Federal Reserve" presence
+
+**RIN Pipeline:** `mcp__policy-events-service__track_rin_lifecycle`
+- options_windows array shows vol expansion dates
+- Proposed→Final creates 3-6 month calendar spreads
+- priority="Economically Significant" = material impact
 4. **Bid-Ask Analysis**: Trades at ask = bullish sweep, at bid = bearish
 5. **Time & Sales Pattern**: Multiple same-strike trades in <5min = block/sweep
 

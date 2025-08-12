@@ -1,134 +1,122 @@
 """Curated list of OpenBB tools for MCP server.
 
-This module defines a fixed set of 58 essential tools that provide comprehensive
+This module defines a fixed set of 44 essential tools that provide comprehensive
 financial analysis capabilities while minimizing context consumption.
 
 IMPORTANT PARAMETER GUIDELINES FOR TOOLS:
-- economy_direction_of_trade: Use country="us" (not "all"), frequency="annual", limit=100
-- economy_balance_of_payments: Always include start_date
-- news_world/news_company: Use limit=20 with yfinance provider
+- news_company: Use limit=20 with yfinance provider
 - etf_equity_exposure: Use sector ETFs (XLK, XLF) not broad market (SPY)
-- equity_discovery_gainers: Use limit=50 to manage response size
-- economy_fred_series: NEVER use limit parameter, use date ranges instead
 - fixedincome_government_treasury_rates: Use provider="federal_reserve" not FMP
+- equity_ownership_form_13f: Use provider="sec" for free access
+- equity_ownership_insider_trading: Use provider="sec" for free access
 
 PREFERRED PROVIDERS:
 - equity_estimates_consensus: Use provider="yfinance" (free)
-- equity_fundamental_income: Use provider="yfinance" or "polygon" (both free)
-- equity_ownership_insider_trading: Use provider="sec" (free)
+- equity_fundamental_*: Use provider="yfinance" (free)
+- equity_ownership_*: Use provider="sec" (free)
+- fixedincome_government_*: Use provider="federal_reserve" (free)
 
-REMOVED TOOLS (5 unfixable):
-- economy_export_destinations: EconDB API broken, returns HTML
-- economy_port_volume: EconDB API structure error
-- derivatives_options_unusual: Requires paid intrinio API
-- derivatives_options_snapshots: Requires paid intrinio API  
-- equity_fundamental_trailing_dividend_yield: Requires paid tiingo API
+REMOVED TOOLS (26 noise/redundant):
+Macro noise: economy_fred_series, economy_fred_search, economy_indicators, 
+             economy_country_profile, economy_composite_leading_indicator,
+             economy_survey_bls_search, economy_survey_bls_series,
+             economy_direction_of_trade, economy_balance_of_payments, economy_gdp_forecast
+News noise: news_world
+Equity screeners: equity_search, equity_discovery_gainers, equity_discovery_growth_tech,
+                 equity_discovery_undervalued_large_caps, equity_price_quote
+ETF duplicates: etf_search, etf_countries, etf_info, etf_price_performance, etf_historical
+Fixed income: fixedincome_bond_indices, fixedincome_mortgage_indices,
+             fixedincome_yield_curve, fixedincome_spreads
 
-Updated: 2025-08-10 - Reduced from 60 to 58 tools (removed unused index_constituents, index_available)
+ADDED TOOLS (10 high-ROI SEC/EDGAR and shorts tools):
+SEC Core: regulators_sec_filing_headers, regulators_sec_htm_file, regulators_sec_rss_litigation,
+         regulators_sec_cik_map, regulators_sec_symbol_map, regulators_sec_institutions_search
+XBRL: equity_compare_company_facts, equity_fundamental_management_discussion_analysis
+Shorts: equity_shorts_fails_to_deliver (SEC), equity_shorts_short_interest (FINRA - free),
+        equity_shorts_short_volume (Stockgrid - free)
+
+Updated: 2025-08-12 - Total of 44 curated tools with free shorts data providers installed
 """
 
 # Immutable set of curated tools - these are the ONLY tools that will be available
 CURATED_TOOLS = frozenset({
-    # Economy Tools (18 tools - all working with proper parameters)
-    # GDP & Growth
-    "economy_gdp_real",
-    "economy_gdp_nominal", 
-    "economy_gdp_forecast",
-    
-    # Inflation & Prices
+    # Economy Tools (5 canonical tools only)
     "economy_cpi",
-    "economy_retail_prices",
-    "economy_house_price_index",
-    
-    # Interest Rates & Money (excluding non-working money_measures)
-    "economy_interest_rates",
-    
-    # Employment & Trade
     "economy_unemployment",
-    "economy_balance_of_payments",  # Requires date parameters
-    "economy_survey_nonfarm_payrolls",  # Added as free alternative
+    "economy_interest_rates",
+    "economy_gdp_real",
+    "economy_gdp_nominal",
+    # Optional (off by default): economy_house_price_index, economy_retail_prices
     
-    # FRED & BLS Access
-    "economy_fred_series",
-    "economy_fred_search",
-    "economy_survey_bls_series",
-    "economy_survey_bls_search",
-    
-    # Leading Indicators
-    "economy_composite_leading_indicator",
-    
-    # Trade & International Analysis (3 tools - removed broken EconDB tools)
-    "economy_direction_of_trade",  # Bilateral trade flows (IMF) - use specific params
-    "economy_indicators",  # IMF/EconDB indicators including reserves
-    "economy_country_profile",  # Country economic overview (EconDB)
-    
-    # Equity Tools (16 tools - mix of working and free alternatives)
-    # Search & Quotes
-    "equity_search",
-    "equity_price_quote",
+    # Equity Tools (11 tools - fundamentals, ownership, prices)
+    # Prices & Performance
     "equity_price_historical",
-    "equity_price_performance",  # Added free tool
+    "equity_price_performance",
     
-    # Fundamental Analysis (using free alternatives)
+    # Fundamental Analysis (using yfinance provider)
     "equity_fundamental_balance",
     "equity_fundamental_income",
     "equity_fundamental_cash",
     "equity_fundamental_dividends",
     "equity_fundamental_metrics",
-    "equity_fundamental_multiples",  # Free alternative to ratios
+    "equity_fundamental_multiples",
+    "equity_fundamental_management_discussion_analysis",  # MD&A extractor from SEC filings
     
-    # Company Research (using free alternatives)
+    # Company Research
     "equity_profile",
     "equity_estimates_consensus",
-    "equity_discovery_filings",  # Free alternative to compare_peers
-    # New discovery/screening tools (YFinance provider)
-    "equity_discovery_gainers",  # Top gaining stocks
-    "equity_discovery_undervalued_large_caps",  # Value screening
-    "equity_discovery_growth_tech",  # Growth stock screening
+    # "equity_analyst_estimates",  # Removed - doesn't exist as endpoint
     
-    # Ownership Data (using free alternatives)
-    "equity_ownership_insider_trading",
-    "equity_ownership_form_13f",  # Free alternative to institutional
+    # Ownership & Filings (SEC provider)
+    "equity_ownership_insider_trading",  # Use provider='sec'
+    "equity_ownership_form_13f",  # Use provider='sec'
+    "equity_discovery_filings",  # FMP for ticker-first discovery
     
-    # Fixed Income Tools (6 tools - all working with parameters)
-    "fixedincome_government_treasury_rates",  # Requires date parameters
+    # Shorts & Market Frictions (SEC/FINRA/Stockgrid data)
+    "equity_shorts_fails_to_deliver",  # FTD data from SEC
+    "equity_shorts_short_interest",  # Short interest from FINRA (free)
+    "equity_shorts_short_volume",  # Short volume from Stockgrid (free)
+    
+    # XBRL & Company Facts
+    "equity_compare_company_facts",  # SEC companyfacts API
+    
+    # SEC/EDGAR Tools (6 new regulatory/filings tools)
+    "regulators_sec_filing_headers",  # Fast form classification
+    "regulators_sec_htm_file",  # Source HTML for LLM parsing
+    "regulators_sec_rss_litigation",  # Enforcement & litigation feed
+    "regulators_sec_cik_map",  # CIK/Symbol mapping
+    "regulators_sec_symbol_map",  # Symbol/CIK mapping  
+    "regulators_sec_institutions_search",  # Find institutional CIKs
+    
+    # Fixed Income Tools (4 canonical tools)
+    "fixedincome_government_treasury_rates",  # Keep for LLM access
     "fixedincome_government_yield_curve",
-    "fixedincome_spreads_tcm",  # Free alternative to treasury_yield
-    "fixedincome_spreads_treasury_effr",  # Correct name
-    # New fixed income indices (FRED provider)
-    "fixedincome_bond_indices",  # Bond market indices
-    "fixedincome_mortgage_indices",  # Mortgage rate indices
+    "fixedincome_spreads_tcm",
+    "fixedincome_spreads_treasury_effr",
     
-    # ETF Tools (8 tools - all working)
-    "etf_search",
-    "etf_info",
+    # ETF Tools (3 essential tools only)
     "etf_holdings",
-    "etf_price_performance",
-    "etf_historical",
-    # New ETF portfolio analysis tools (FMP provider)
-    "etf_sectors",  # Sector breakdown of ETF holdings
-    "etf_countries",  # Geographic exposure analysis
-    "etf_equity_exposure",  # Individual stock exposure in ETFs
+    "etf_sectors",  # Sector breakdown
+    "etf_equity_exposure",  # Individual stock exposure
     
-    # Index Tools (1 tool - removed unused)
+    # Index Tools (1 tool)
     "index_price_historical",
     
-    # Derivatives Tools (2 tools - removed paid-only intrinio tools)
+    # Derivatives Tools (2 tools)
     "derivatives_options_chains",
-    "derivatives_futures_curve",  # Futures curve analysis (YFinance)
+    "derivatives_futures_curve",
     
-    # News Tools (2 tools - with corrected names)
-    "news_world",  # Corrected from news_general
-    "news_company",
+    # News Tools (1 tool - company specific only)
+    "news_company",  # Keep for issuer-specific headlines
     
-    # Currency Tools (1 tool - removed non-existent)
+    # Currency Tools (1 tool)
     "currency_price_historical",
     
-    # Commodity Tools (1 tool - with corrected name)
-    "commodity_price_spot",  # Corrected from commodity_price_historical
+    # Commodity Tools (1 tool)
+    "commodity_price_spot",
     
-    # Cryptocurrency Tools (1 tool - new)
-    "crypto_price_historical",  # Cryptocurrency prices (YFinance/FMP)
+    # Cryptocurrency Tools (1 tool)
+    "crypto_price_historical",
 })
 
 def is_curated_tool(tool_name: str) -> bool:
@@ -149,3 +137,52 @@ def get_curated_tools_count() -> int:
         The number of tools in the curated list
     """
     return len(CURATED_TOOLS)
+
+# Blocklist of removed tools
+BLOCKLIST = frozenset({
+    # Macro noise
+    "economy_fred_series", "economy_fred_search", "economy_indicators",
+    "economy_country_profile", "economy_composite_leading_indicator",
+    "economy_survey_bls_search", "economy_survey_bls_series",
+    "economy_direction_of_trade", "economy_balance_of_payments", "economy_gdp_forecast",
+    "economy_survey_nonfarm_payrolls", "economy_retail_prices", "economy_house_price_index",
+    
+    # News noise
+    "news_world", "news_market",
+    
+    # Equity screeners/duplicates
+    "equity_search", "equity_discovery_gainers", "equity_discovery_growth_tech",
+    "equity_discovery_undervalued_large_caps", "equity_price_quote", "equity_shock",
+    
+    # ETF duplicates
+    "etf_search", "etf_countries", "etf_info", "etf_price_performance", "etf_historical",
+    
+    # Fixed income duplicates
+    "fixedincome_yield_curve", "fixedincome_spreads",
+    "fixedincome_bond_indices", "fixedincome_mortgage_indices",
+})
+
+# Provider overrides to ensure free access
+PROVIDER_OVERRIDES = {
+    "equity_fundamental_balance": "yfinance",
+    "equity_fundamental_income": "yfinance",
+    "equity_fundamental_cash": "yfinance",
+    "equity_fundamental_dividends": "yfinance",
+    "equity_fundamental_metrics": "yfinance",
+    "equity_fundamental_multiples": "yfinance",
+    "equity_ownership_insider_trading": "sec",
+    "equity_ownership_form_13f": "sec",
+    "equity_estimates_consensus": "yfinance",
+    "fixedincome_government_treasury_rates": "federal_reserve",
+    "fixedincome_government_yield_curve": "federal_reserve",
+}
+
+# Parameter defaults for tools
+PARAMETER_DEFAULTS = {
+    "economy_cpi": {"country": "united_states"},
+    "equity_ownership_form_13f": {"provider": "sec"},
+    "equity_ownership_insider_trading": {"provider": "sec"},
+    "news_company": {"limit": 20, "provider": "yfinance"},
+    "fixedincome_government_treasury_rates": {"provider": "federal_reserve"},
+    "etf_equity_exposure": {"limit": 100},
+}

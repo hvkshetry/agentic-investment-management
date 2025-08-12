@@ -1,7 +1,7 @@
 ---
 name: equity-analyst
 description: Equity research and fundamental analysis specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__equity_estimates_consensus, mcp__openbb-curated__equity_discovery_gainers, mcp__openbb-curated__equity_discovery_undervalued_large_caps, mcp__openbb-curated__equity_discovery_growth_tech, mcp__openbb-curated__equity_discovery_filings, mcp__openbb-curated__equity_fundamental_multiples, mcp__openbb-curated__equity_fundamental_balance, mcp__openbb-curated__equity_fundamental_cash, mcp__openbb-curated__equity_fundamental_dividends, mcp__openbb-curated__equity_fundamental_income, mcp__openbb-curated__equity_fundamental_metrics, mcp__openbb-curated__equity_ownership_insider_trading, mcp__openbb-curated__equity_ownership_form_13f, mcp__openbb-curated__equity_price_quote, mcp__openbb-curated__equity_price_historical, mcp__openbb-curated__equity_price_performance, mcp__openbb-curated__equity_search, mcp__openbb-curated__equity_profile, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__equity_estimates_consensus, mcp__openbb-curated__equity_discovery_filings, mcp__openbb-curated__equity_fundamental_multiples, mcp__openbb-curated__equity_fundamental_balance, mcp__openbb-curated__equity_fundamental_cash, mcp__openbb-curated__equity_fundamental_dividends, mcp__openbb-curated__equity_fundamental_income, mcp__openbb-curated__equity_fundamental_metrics, mcp__openbb-curated__equity_fundamental_management_discussion_analysis, mcp__openbb-curated__equity_ownership_insider_trading, mcp__openbb-curated__equity_ownership_form_13f, mcp__openbb-curated__equity_price_historical, mcp__openbb-curated__equity_price_performance, mcp__openbb-curated__equity_profile, mcp__openbb-curated__equity_compare_company_facts, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__openbb-curated__regulators_sec_filing_headers, mcp__openbb-curated__regulators_sec_htm_file, mcp__policy-events-service__track_congressional_trades, mcp__policy-events-service__monitor_key_hearings, mcp__policy-events-service__track_material_bills, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -28,6 +28,22 @@ If extracting from another tool's output, convert strings to native types first.
 - Peer comparison and sector analysis
 - Analyst consensus tracking
 - Insider trading and ownership analysis
+
+## Policy Signal Tracking
+
+**Congressional Trades:** `mcp__policy-events-service__track_congressional_trades`
+- Check min_amount=50000 for high-conviction trades
+- unusual_activity=true flags sector clustering
+- Match ticker to portfolio holdings for follow signals
+
+**CEO Hearings:** `mcp__policy-events-service__monitor_key_hearings`
+- Filter for CEO testimony in affected_sectors
+- Binary event if antitrust or regulatory focus
+
+**Sector Bills:** `mcp__policy-events-service__track_material_bills`
+- Check affected_sectors matches holdings
+- min_materiality=6 for actionable signals
+- status="PASSED_HOUSE" or "PASSED_SENATE" = imminent
 - Technical indicator integration
 
 ## Required Tool Parameters
@@ -38,22 +54,28 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 - ❌ Wrong: limit: "50"
 
 **Use these providers for free access:**
-- `equity_estimates_consensus`: provider="yfinance"
-- `equity_fundamental_income`: provider="yfinance" or "polygon"
+- `equity_estimates_consensus`: provider="yfinance" (FREE analyst consensus)
+- `equity_fundamental_*`: provider="yfinance" (all fundamentals free)
+- `equity_fundamental_management_discussion_analysis`: provider="sec" (MD&A extraction)
 - `equity_ownership_insider_trading`: provider="sec"
-- `equity_discovery_gainers`: Use limit=20 (integer, not "20" string)
+- `equity_ownership_form_13f`: provider="sec"
+- `equity_shorts_fails_to_deliver`: SEC FTD data
+- `equity_shorts_short_interest`: FINRA (free, no API key)
+- `equity_shorts_short_volume`: Stockgrid (free, no API key)
+- `equity_compare_company_facts`: XBRL facts from SEC
 
 ## MCP Tool Examples (CRITICAL)
 
 **CORRECT - Integers without quotes:**
 ```python
-mcp__openbb-curated__equity_discovery_gainers(provider="yfinance", limit=20)
+mcp__openbb-curated__equity_discovery_filings(symbol="AAPL", limit=10)
 mcp__openbb-curated__equity_fundamental_metrics(symbol="AAPL", provider="yfinance")
+mcp__openbb-curated__equity_ownership_form_13f(symbol="AAPL", provider="sec")
 ```
 
 **WRONG - Never use quotes for numbers:**
 ```python
-mcp__openbb-curated__equity_discovery_gainers(limit="20")  # ❌ FAILS
+mcp__openbb-curated__equity_discovery_filings(limit="10")  # ❌ FAILS
 ```
 
 **Quick Reference:**

@@ -10,6 +10,8 @@ fastmcp>=0.1.0                # MCP server framework
 # Market Data & Financial Libraries
 # =============================================================================
 openbb>=4.0.0                 # Comprehensive market data platform
+openbb-finra>=1.4.2           # FINRA short interest data (free)
+openbb-stockgrid>=1.4.2       # Short volume/dark pool data (free)
 yfinance>=0.2.40              # Yahoo Finance data
 pandas>=2.0.0                 # Data manipulation
 numpy>=1.24.0                 # Numerical computing
@@ -55,6 +57,15 @@ hypothesis>=6.90.0            # Property-based testing
 asyncio                       # Built-in, but listing for clarity
 aiohttp>=3.9.0                # Async HTTP client/server
 httpx>=0.25.0                 # Modern async HTTP client (used by FastMCP)
+
+# =============================================================================
+# Policy Events Service Dependencies
+# =============================================================================
+beautifulsoup4>=4.12.0        # HTML parsing for Senate disclosures
+lxml>=4.9.0                   # XML parsing for government data
+python-dotenv>=1.0.0          # Environment variable management
+redis>=5.0.0                  # Cache for deduplication (optional)
+selenium>=4.15.0              # Web scraping for Senate eFD (optional)
 
 # =============================================================================
 # Data Validation

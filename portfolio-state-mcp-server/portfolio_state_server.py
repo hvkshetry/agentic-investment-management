@@ -5,9 +5,9 @@ Provides centralized portfolio state management with tax lot tracking
 """
 
 from fastmcp import FastMCP, Context
-from pydantic import Field
+from pydantic import Field, ValidationError
 from typing import Dict, Any, List, Optional, Union
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 import pandas as pd
 import json
@@ -22,16 +22,103 @@ import time
 import uuid
 import os
 import shutil
+import sys
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("portfolio_state_server")
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+from shared.atomic_writer import atomic_dump_json
+from shared.money_utils import money, calculate_gain_loss, calculate_position_value
+
+# Import Pydantic models
+from models import (
+    GetPortfolioStateRequest,
+    GetPortfolioStateResponse,
+    ImportBrokerCSVRequest,
+    ImportBrokerCSVResponse,
+    UpdateMarketPricesRequest,
+    UpdateMarketPricesResponse,
+    SimulateSaleRequest,
+    SimulateSaleResponse,
+    GetTaxLossHarvestingRequest,
+    GetTaxLossHarvestingResponse,
+    RecordTransactionRequest,
+    RecordTransactionResponse,
+    ErrorResponse,
+    TaxLotModel,
+    PositionModel,
+    PortfolioSummaryModel,
+    AssetAllocationModel,
+    TaxImplicationModel,
+    SoldLotModel,
+    HarvestingOpportunityModel
+)
+
+# Configure logging properly without affecting other modules
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
 
 # Initialize FastMCP server with proper error handling
 mcp = FastMCP("portfolio-state-server")
 
 # Store original tool decorator for fallback
 _original_tool = mcp.tool
+
+
+def validate_with_pydantic(request_model=None, response_model=None):
+    """
+    Decorator to add Pydantic validation to MCP tools.
+    
+    Args:
+        request_model: Pydantic model for validating request parameters
+        response_model: Pydantic model for validating response data
+    """
+    def decorator(func):
+        async def wrapper(ctx: Context, **kwargs):
+            # Validate request if model provided
+            if request_model:
+                try:
+                    # Create and validate request
+                    validated_request = request_model(**kwargs)
+                    # Convert back to dict for the function
+                    kwargs = validated_request.model_dump()
+                except ValidationError as e:
+                    logger.error(f"Request validation error in {func.__name__}: {e}")
+                    return ErrorResponse(
+                        error="validation_error",
+                        message="Invalid request parameters",
+                        details={"validation_errors": e.errors()}
+                    ).model_dump()
+            
+            # Call the original function
+            try:
+                result = await func(ctx, **kwargs)
+                
+                # Validate response if model provided
+                if response_model and not isinstance(result, dict) or result.get("error") is None:
+                    try:
+                        validated_response = response_model(**result)
+                        return validated_response.model_dump()
+                    except ValidationError as e:
+                        logger.error(f"Response validation error in {func.__name__}: {e}")
+                        # Return the original result if validation fails
+                        # This ensures backward compatibility
+                        return result
+                
+                return result
+                
+            except Exception as e:
+                logger.error(f"Error in {func.__name__}: {e}")
+                return ErrorResponse(
+                    error="execution_error",
+                    message=str(e),
+                    details={"function": func.__name__}
+                ).model_dump()
+        
+        # Preserve function metadata
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        return wrapper
+    return decorator
 
 class CostBasisMethod(str, Enum):
     """Cost basis calculation methods"""
@@ -74,8 +161,8 @@ class TaxLot:
     
     def update_holding_period(self):
         """Update holding period and long-term status"""
-        purchase = datetime.strptime(self.purchase_date, "%Y-%m-%d")
-        today = datetime.now()
+        purchase = datetime.strptime(self.purchase_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        today = datetime.now(timezone.utc)
         self.holding_period_days = (today - purchase).days
         self.is_long_term = self.holding_period_days > 365
 
@@ -131,7 +218,7 @@ class PortfolioStateManager:
         
         # Optional: Backup existing state if it exists
         if self.state_file.exists():
-            backup_file = self.state_file.parent / f"portfolio_state_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            backup_file = self.state_file.parent / f"portfolio_state_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
             shutil.copy(self.state_file, backup_file)
             logger.info(f"Backed up existing state to {backup_file}")
         
@@ -179,11 +266,10 @@ class PortfolioStateManager:
                     for symbol, lots in self.tax_lots.items()
                 },
                 'accounts': self.accounts,
-                'last_updated': datetime.now().isoformat()
+                'last_updated': datetime.now(timezone.utc).isoformat()
             }
             
-            with open(self.state_file, 'w') as f:
-                json.dump(state, f, indent=2, default=str)
+            atomic_dump_json(state, self.state_file)
             
             logger.info("Portfolio state saved")
         except Exception as e:
@@ -246,7 +332,7 @@ class PortfolioStateManager:
             symbols = list(self.tax_lots.keys())
         
         prices = {}
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         symbols_to_fetch = []
         
         # First pass: check cache and identify symbols needing fetch
@@ -580,7 +666,7 @@ async def get_portfolio_state(
             "positions": positions_summary,
             "tax_lots": all_lots,
             "accounts": portfolio_manager.accounts,
-            "last_updated": datetime.now().isoformat(),
+            "last_updated": datetime.now(timezone.utc).isoformat(),
             "confidence": 1.0
         }
     except Exception as e:
@@ -625,7 +711,7 @@ async def import_broker_csv(
         
         portfolio_manager.accounts[account_id].update({
             "broker": broker,
-            "last_import": datetime.now().isoformat(),
+            "last_import": datetime.now(timezone.utc).isoformat(),
             "num_lots_imported": added_count
         })
         
@@ -663,7 +749,7 @@ async def update_market_prices(
     try:
         # If prices were provided, update the cache first
         if prices:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             for symbol, price in prices.items():
                 portfolio_manager.price_cache[symbol] = (float(price), now)
                 logger.info(f"Updated cached price for {symbol}: ${price:.2f}")
@@ -680,7 +766,7 @@ async def update_market_prices(
             "prices_updated": len(prices),
             "portfolio_value": total_value,
             "total_unrealized_gain": total_unrealized,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "confidence": 1.0
         }
     except Exception as e:
@@ -732,15 +818,16 @@ async def simulate_sale(
         lot_details = []
         
         for lot in lots_to_sell:
-            proceeds = lot.quantity * sale_price
-            gain = proceeds - lot.cost_basis
+            proceeds = calculate_position_value(lot.quantity, sale_price)
+            gain_loss_info = calculate_gain_loss(proceeds, lot.cost_basis)
+            gain = gain_loss_info['gain_loss']
             
             total_proceeds += proceeds
             total_cost_basis += lot.cost_basis
             
             # Check holding period
-            purchase_date = datetime.strptime(lot.purchase_date, "%Y-%m-%d")
-            holding_days = (datetime.now() - purchase_date).days
+            purchase_date = datetime.strptime(lot.purchase_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            holding_days = (datetime.now(timezone.utc) - purchase_date).days
             is_long_term = holding_days > 365
             
             if is_long_term:
@@ -760,7 +847,8 @@ async def simulate_sale(
                 "is_long_term": is_long_term
             })
         
-        total_gain = total_proceeds - total_cost_basis
+        total_gain_loss_info = calculate_gain_loss(total_proceeds, total_cost_basis)
+        total_gain = total_gain_loss_info['gain_loss']
         
         return {
             "symbol": symbol,
@@ -806,7 +894,7 @@ async def get_tax_loss_harvesting_opportunities(
         portfolio_manager.refresh_prices()
         
         opportunities = []
-        today = datetime.now()
+        today = datetime.now(timezone.utc)
         
         for symbol, position in portfolio_manager.positions.items():
             if position.unrealized_gain >= 0:
@@ -818,7 +906,7 @@ async def get_tax_loss_harvesting_opportunities(
             # Check each lot for harvesting potential
             for lot in position.tax_lots:
                 # Skip recent purchases (wash sale rule)
-                purchase_date = datetime.strptime(lot.purchase_date, "%Y-%m-%d")
+                purchase_date = datetime.strptime(lot.purchase_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 days_held = (today - purchase_date).days
                 
                 if days_held < exclude_recent_days:
@@ -855,7 +943,7 @@ async def get_tax_loss_harvesting_opportunities(
             "total_opportunities": len(opportunities),
             "total_harvestable_losses": total_losses,
             "estimated_tax_benefit": total_tax_benefit,
-            "as_of": datetime.now().isoformat(),
+            "as_of": datetime.now(timezone.utc).isoformat(),
             "confidence": 0.95
         }
     except Exception as e:
@@ -894,7 +982,7 @@ async def record_transaction(
         if transaction_type.lower() == "buy":
             # Create new tax lot
             lot = TaxLot(
-                lot_id=f"{symbol}_{date}_{datetime.now().timestamp()}",
+                lot_id=f"{symbol}_{date}_{datetime.now(timezone.utc).timestamp()}",
                 symbol=symbol,
                 quantity=quantity,
                 purchase_date=date,
@@ -934,9 +1022,10 @@ async def record_transaction(
                 }
             
             # Remove sold lots from portfolio
-            total_proceeds = quantity * price
-            total_cost_basis = sum(lot.cost_basis for lot in lots_to_sell)
-            realized_gain = total_proceeds - total_cost_basis
+            total_proceeds = calculate_position_value(quantity, price)
+            total_cost_basis = sum(money(lot.cost_basis) for lot in lots_to_sell)
+            gain_loss_info = calculate_gain_loss(total_proceeds, total_cost_basis)
+            realized_gain = gain_loss_info['gain_loss']
             
             # Update tax lots
             remaining_lots = []

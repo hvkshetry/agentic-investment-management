@@ -46,3 +46,12 @@ DRAFT_*.md
 
 # Data files (keep sample data out of repo)
 sample_portfolio.jsonoracle/
+
+# Additional cleanup entries
+git_push_command.txt
+push_to_github.*
+*_backup_*.json
+test_results_*.json
+debug.json
+debug.py
+/openbb/

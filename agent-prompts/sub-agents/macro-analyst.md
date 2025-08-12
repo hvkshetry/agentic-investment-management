@@ -1,7 +1,7 @@
 ---
 name: macro-analyst
 description: Macroeconomic analysis and global market assessment
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__economy_gdp_forecast, mcp__openbb-curated__economy_gdp_nominal, mcp__openbb-curated__economy_gdp_real, mcp__openbb-curated__economy_cpi, mcp__openbb-curated__economy_unemployment, mcp__openbb-curated__economy_composite_leading_indicator, mcp__openbb-curated__economy_indicators, mcp__openbb-curated__economy_interest_rates, mcp__openbb-curated__economy_fred_series, mcp__openbb-curated__economy_fred_search, mcp__openbb-curated__economy_survey_bls_series, mcp__openbb-curated__economy_survey_bls_search, mcp__openbb-curated__economy_balance_of_payments, mcp__openbb-curated__economy_country_profile, mcp__openbb-curated__economy_house_price_index, mcp__openbb-curated__economy_retail_prices, mcp__openbb-curated__economy_survey_nonfarm_payrolls, mcp__openbb-curated__economy_direction_of_trade, mcp__openbb-curated__currency_price_historical, mcp__openbb-curated__commodity_price_spot, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__sequential-thinking__sequentialthinking, WebSearch, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__economy_gdp_nominal, mcp__openbb-curated__economy_gdp_real, mcp__openbb-curated__economy_cpi, mcp__openbb-curated__economy_unemployment, mcp__openbb-curated__economy_interest_rates, mcp__openbb-curated__currency_price_historical, mcp__openbb-curated__commodity_price_spot, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__policy-events-service__monitor_key_hearings, mcp__policy-events-service__monitor_key_nominations, mcp__sequential-thinking__sequentialthinking, WebSearch, LS, Read, Write
 model: sonnet
 ---
 
@@ -34,6 +34,18 @@ If extracting from another tool's output, convert strings to native types first.
 - **NEW: Provide economic regime for multi-period optimization**
 - **NEW: Generate scenario-based market views**
 
+## Policy Event Monitoring
+
+**Key Hearings:** `mcp__policy-events-service__monitor_key_hearings`
+- Check days_ahead=14 for upcoming Fed testimony
+- Returns binary_event_date for FOMC hearings (vol events)
+- Filter chamber="senate" for Banking Committee focus
+
+**Nominations:** `mcp__policy-events-service__monitor_key_nominations`
+- Track Fed governor and Treasury secretary nominations
+- Confirmation signals policy regime shift
+- Check materiality_score >= 7 for market-moving positions
+
 ## Critical Tool Parameters
 
 **CRITICAL - Parameter Types:**
@@ -42,21 +54,21 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 - ❌ Wrong: limit: "100"
 
 **ALWAYS use these parameters to prevent failures:**
-- `economy_direction_of_trade`: country="us", frequency="annual", limit=100 (integer not string)
-- `economy_balance_of_payments`: include start_date parameter
-- `economy_fred_series`: use date ranges, NEVER limit parameter
+- `economy_cpi`: Use country="united_states" for US data
+- `fixedincome_government_treasury_rates`: Use provider="federal_reserve" for official data
 
 ## MCP Tool Examples (CRITICAL)
 
 **CORRECT - Integers without quotes:**
 ```python
-mcp__openbb-curated__economy_direction_of_trade(country="us", limit=100)
-mcp__openbb-curated__economy_cpi(provider="fred", units="growth_rate")
+mcp__openbb-curated__economy_cpi(country="united_states")
+mcp__openbb-curated__economy_gdp_real(provider="oecd")
+mcp__openbb-curated__fixedincome_government_treasury_rates(provider="federal_reserve")
 ```
 
 **WRONG - Never use quotes for numbers:**
 ```python
-mcp__openbb-curated__economy_direction_of_trade(limit="100")  # ❌ FAILS
+mcp__openbb-curated__economy_unemployment(limit="100")  # ❌ FAILS
 ```
 
 ## Analysis Framework
@@ -231,20 +243,21 @@ All responses to other agents must include structured JSON:
 
 ## CRITICAL Tool-Specific Parameters
 
-**MUST Include Date Parameters:**
-- `economy_balance_of_payments`: ALWAYS use `start_date` (e.g., 1 year ago) to avoid token limits
-- `economy_export_destinations`: Include `start_date` for manageable output
-- `economy_direction_of_trade`: Use date ranges to limit data volume
+**Key Economic Indicators:**
+- `economy_gdp_real`: Real GDP growth, use provider="oecd" for consistency
+- `economy_gdp_nominal`: Nominal GDP levels
+- `economy_cpi`: Inflation data, use country="united_states"
+- `economy_unemployment`: Labor market health
+- `economy_interest_rates`: Central bank policy rates
 
-**FRED Series Best Practices:**
-- Use `economy_fred_series` with specific series IDs (e.g., "DGS10" for 10Y Treasury)
-- Include `start_date` and `end_date` to control data volume
-- Common series: GDP ("GDP"), CPI ("CPIAUCSL"), Unemployment ("UNRATE")
+**Fixed Income Tools:**
+- `fixedincome_government_treasury_rates`: Use provider="federal_reserve"
+- `fixedincome_government_yield_curve`: Term structure analysis
 
 **Data Source Selection:**
-- Prefer FRED for US economic data (most comprehensive)
-- Use OECD for international comparisons
-- Use IMF/EconDB for emerging markets data
+- Prefer provider="oecd" for international comparisons
+- Use provider="federal_reserve" for US rates data
+- Currency and commodity data available for cross-asset analysis
 
 ## Enhanced Outputs
 

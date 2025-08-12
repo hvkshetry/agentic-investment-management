@@ -9,9 +9,15 @@ import logging
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import os
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from shared.atomic_writer import atomic_dump_json
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +58,7 @@ class CorrelationService:
             return False
         
         cached_time = datetime.fromisoformat(cache_entry['timestamp'])
-        return datetime.now() - cached_time < self.cache_ttl
+        return datetime.now(timezone.utc) - cached_time < self.cache_ttl
     
     def _load_cache(self):
         """Load cache from file if it exists"""
@@ -78,8 +84,7 @@ class CorrelationService:
                 key: value for key, value in self.cache.items()
                 if self._is_cache_valid(value)
             }
-            with open(self.cache_file, 'w') as f:
-                json.dump(valid_cache, f)
+            atomic_dump_json(valid_cache, self.cache_file)
         except Exception as e:
             logger.warning(f"Could not save correlation cache: {e}")
     
@@ -116,7 +121,7 @@ class CorrelationService:
         
         try:
             # Fetch historical data
-            end_date = datetime.now()
+            end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=int(lookback_days * 1.5))  # Extra buffer
             
             data = self.data_pipeline.fetch_equity_data(
@@ -134,7 +139,7 @@ class CorrelationService:
             # Cache the result
             self.cache[cache_key] = {
                 'matrix': corr_matrix.values.tolist(),
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'tickers': tickers,
                 'lookback_days': lookback_days
             }
@@ -208,7 +213,7 @@ class CorrelationService:
         # Get individual volatilities
         data = self.data_pipeline.fetch_equity_data(
             tickers=tickers,
-            start_date=(datetime.now() - timedelta(days=int(lookback_days * 1.5))).strftime('%Y-%m-%d')
+            start_date=(datetime.now(timezone.utc) - timedelta(days=int(lookback_days * 1.5))).strftime('%Y-%m-%d')
         )
         
         returns = data['returns']

@@ -1,7 +1,7 @@
 ---
 name: market-scanner
 description: Multi-asset market monitoring and news analysis
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__news_world, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, mcp__openbb-curated__regulators_sec_rss_litigation, mcp__openbb-curated__equity_discovery_filings, mcp__policy-events-service__track_material_bills, mcp__policy-events-service__monitor_key_hearings, mcp__policy-events-service__watch_federal_rules, mcp__policy-events-service__track_congressional_trades, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -30,6 +30,8 @@ If extracting from another tool's output, convert strings to native types first.
 - Currency movement analysis
 - Market regime identification
 - Event risk assessment
+- Policy event monitoring for market catalysts
+- Regulatory pipeline tracking
 
 ## Tool Usage Requirements
 
@@ -42,18 +44,21 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 
 **CORRECT - Integers without quotes:**
 ```python
-mcp__openbb-curated__news_world(limit=20, provider="yfinance")
 mcp__openbb-curated__news_company(symbol="AAPL", limit=20)
+mcp__openbb-curated__equity_discovery_filings(limit=10)
+mcp__openbb-curated__regulators_sec_rss_litigation()
 ```
 
 **WRONG - Never use quotes for numbers:**
 ```python
-mcp__openbb-curated__news_world(limit="20")  # ❌ FAILS
+mcp__openbb-curated__news_company(limit="20")  # ❌ FAILS
 ```
 
-**Prevent token overflow with news tools:**
-- `news_world` and `news_company`: ALWAYS use limit=20 (integer), provider="yfinance"
-- If news tools fail, use WebSearch as fallback
+**Available tools for market monitoring:**
+- `news_company`: Company-specific news (use limit=20, provider="yfinance")
+- `regulators_sec_rss_litigation`: SEC enforcement and litigation news
+- `equity_discovery_filings`: Recent SEC filings across market
+- WebSearch: Fallback for broader market news
 
 ## Scanning Framework
 
@@ -180,6 +185,28 @@ Track non-traditional indicators:
 - M&A announcements
 - Regulatory changes
 - Economic data beats/misses
+
+## Policy Event Monitoring
+
+**Daily Check:** `mcp__policy-events-service__track_material_bills`
+- min_materiality=6 for market-moving legislation
+- days_back=1 for new bills since yesterday
+- Watch status changes (INTRODUCED→PASSED_HOUSE is major)
+
+**Upcoming Catalysts:** `mcp__policy-events-service__monitor_key_hearings`
+- days_ahead=7 for weekly calendar
+- Check binary_event_date for volatility events
+- FOMC testimony = immediate market impact
+
+**Regulatory Pipeline:** `mcp__policy-events-service__watch_federal_rules`
+- rule_type="all" for comprehensive view
+- Proposed rules with comment_close_date = volatility window
+- Final rules with effective_date = compliance deadline
+
+**Smart Money Flow:** `mcp__policy-events-service__track_congressional_trades`
+- unusual_activity=true for sector rotation signals
+- min_amount=100000 for high-conviction trades
+- Clustering in sector = leading indicator
 
 ## Alert Thresholds
 

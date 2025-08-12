@@ -5,11 +5,16 @@ Provides centralized caching to eliminate redundant API calls
 """
 
 from typing import Dict, Optional, Tuple, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import logging
 import threading
 from pathlib import Path
+import sys
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+from shared.atomic_writer import atomic_dump_json
 
 logger = logging.getLogger("cache_manager")
 
@@ -61,7 +66,7 @@ class SharedCacheManager:
         with self.lock:
             if key in self.cache:
                 value, timestamp = self.cache[key]
-                age_seconds = (datetime.now() - timestamp).total_seconds()
+                age_seconds = (datetime.now(timezone.utc) - timestamp).total_seconds()
                 
                 if age_seconds < self.ttl_seconds:
                     self.stats["hits"] += 1
@@ -86,7 +91,7 @@ class SharedCacheManager:
             ttl_override: Optional TTL override for this entry
         """
         with self.lock:
-            self.cache[key] = (value, datetime.now())
+            self.cache[key] = (value, datetime.now(timezone.utc))
             self.stats["sets"] += 1
             logger.debug(f"Cache set for {key}")
             
@@ -206,7 +211,7 @@ class SharedCacheManager:
             Number of entries removed
         """
         with self.lock:
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             expired_keys = []
             
             for key, (value, timestamp) in self.cache.items():
@@ -234,8 +239,7 @@ class SharedCacheManager:
                     "timestamp": timestamp.isoformat()
                 }
             
-            with open(self.cache_file, 'w') as f:
-                json.dump(cache_data, f)
+            atomic_dump_json(cache_data, self.cache_file)
         except Exception as e:
             logger.warning(f"Failed to save cache to disk: {e}")
     
@@ -248,7 +252,7 @@ class SharedCacheManager:
             with open(self.cache_file, 'r') as f:
                 cache_data = json.load(f)
             
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             loaded = 0
             
             for key, entry in cache_data.items():

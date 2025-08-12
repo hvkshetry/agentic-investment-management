@@ -5,7 +5,7 @@ Generic CSV parser for unknown broker formats
 import csv
 import io
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from .parser_factory import BaseBrokerParser
@@ -64,7 +64,7 @@ class GenericParser(BaseBrokerParser):
                             date_str = row[col]
                             break
                     
-                    purchase_date = self.parse_date(date_str) if date_str else datetime.now().strftime("%Y-%m-%d")
+                    purchase_date = self.parse_date(date_str) if date_str else datetime.now(timezone.utc).strftime("%Y-%m-%d")
                     
                     # Find price column
                     price = 0
