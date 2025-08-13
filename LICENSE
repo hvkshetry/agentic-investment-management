@@ -1,0 +1,71 @@
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 3, 29 June 2007
+
+ Copyright (C) 2025 AI Investment Management Contributors
+ 
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+===========================================================================
+
+NOTICE OF INCLUDED COMPONENTS:
+
+This project includes the following components with their respective licenses:
+
+1. Double Finance Oracle (./oracle/)
+   - License: GNU General Public License v3.0
+   - Copyright: Double Finance Contributors
+   - Source: Originally from Double Finance
+
+2. PyPortfolioOpt
+   - License: MIT License
+   - Used via pip package
+
+3. Riskfolio-Lib  
+   - License: BSD 3-Clause License
+   - Used via pip package
+
+4. OpenBB Platform
+   - License: AGPL-3.0 (for community version)
+   - Used via pip package
+
+5. Model Context Protocol (MCP)
+   - License: MIT License
+   - Used via pip package
+
+===========================================================================
+
+ADDITIONAL TERMS AND ATTRIBUTIONS:
+
+Tax Optimization Oracle Component:
+The tax optimization oracle in the ./oracle/ directory is derived from 
+Double Finance's optimization engine and is licensed under GPL-3.0. 
+Any modifications to this component must also be distributed under GPL-3.0.
+
+MCP Server Components:
+The MCP server implementations in this project are original work but 
+interface with various financial libraries. Each server's specific 
+dependencies are documented in their respective directories.
+
+Agent Prompts and Workflows:
+The agent prompts in ./agent-prompts/ and workflow configurations in 
+./config/workflows/ are original work created for this project and are 
+covered under the GPL-3.0 license of this project.
+
+===========================================================================
+
+For the full text of the GNU General Public License v3.0, please see:
+https://www.gnu.org/licenses/gpl-3.0.html
+
+For questions about licensing or contributions, please open an issue on:
+https://github.com/hvkshetry/agentic-investment-management

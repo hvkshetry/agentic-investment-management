@@ -395,11 +395,15 @@ We welcome contributions, particularly in areas aligned with our event-driven ro
 
 ## License
 
-MIT License - See LICENSE file for details
+GNU General Public License v3.0 - See [LICENSE](LICENSE) file for details.
+
+This project is licensed under GPL-3.0 due to the inclusion of the Double Finance Oracle component. For detailed licensing information about included components, see the [NOTICE](NOTICE) file.
 
 ## Disclaimer
 
 This system is for educational and research purposes. Not financial advice. Always consult qualified financial advisors for investment decisions.
+
+The software is provided "as is", without warranty of any kind, express or implied. See the LICENSE file for full disclaimer.
 
 ## Acknowledgments
 
