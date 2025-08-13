@@ -197,6 +197,7 @@ class GovInfoBulkClient:
     ) -> List[Dict[str, Any]]:
         """
         Get full details for specific rules identified by LLM.
+        Enhanced to fetch content from Federal Register API when available.
         Document numbers can be either:
         - Granule IDs (e.g., "2025-15325") 
         - Package IDs with granule (e.g., "FR-2025-08-12:2025-15325")
@@ -212,12 +213,40 @@ class GovInfoBulkClient:
                 if ":" in doc_num:
                     package_id, granule_id = doc_num.split(":", 1)
                 else:
-                    # Try to find the package by searching recent FR issues
-                    # This is a fallback - ideally the LLM should pass package_id:granule_id
+                    # If no package ID, try Federal Register API directly
                     granule_id = doc_num
                     
-                    # Search recent FR packages to find which one contains this granule
-                    # For now, construct a direct link as we can't easily search
+                    # Try to fetch from Federal Register API
+                    fr_api_url = f"https://www.federalregister.gov/api/v1/documents/{granule_id}"
+                    
+                    try:
+                        fr_response = await self.session.get(fr_api_url)
+                        
+                        if fr_response.status_code == 200:
+                            fr_data = fr_response.json()
+                            
+                            detailed_rules.append({
+                                "document_number": granule_id,
+                                "title": fr_data.get("title", ""),
+                                "agency": ", ".join(fr_data.get("agencies", [])) if fr_data.get("agencies") else "Unknown",
+                                "rule_type": fr_data.get("type", "Unknown"),
+                                "publication_date": fr_data.get("publication_date", ""),
+                                "effective_date": fr_data.get("effective_on", ""),
+                                "comment_close_date": fr_data.get("comments_close_on", ""),
+                                "abstract": fr_data.get("abstract", ""),
+                                "summary": fr_data.get("abstract", "") or fr_data.get("action", ""),
+                                "significant": fr_data.get("significant", False),
+                                "cfr_references": fr_data.get("cfr_references", []),
+                                "docket_ids": fr_data.get("docket_ids", []),
+                                "pdf_link": fr_data.get("pdf_url", ""),
+                                "html_link": fr_data.get("html_url", ""),
+                                "fr_url": fr_data.get("html_url", f"https://www.federalregister.gov/d/{granule_id}")
+                            })
+                            continue
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch from Federal Register API: {e}")
+                    
+                    # Fallback if Federal Register API fails
                     detailed_rules.append({
                         "document_number": granule_id,
                         "title": f"Federal Register Document {granule_id}",
@@ -226,7 +255,7 @@ class GovInfoBulkClient:
                         "publication_date": "Recent",
                         "effective_date": "See document for effective date",
                         "comment_close_date": "See document for comment deadline",
-                        "summary": f"Document {granule_id} from Federal Register. For full details, search federalregister.gov",
+                        "summary": f"Document {granule_id} from Federal Register. For full details, visit federalregister.gov",
                         "pdf_link": f"https://www.federalregister.gov/documents/search?conditions%5Bterm%5D={granule_id}",
                         "text_link": "",
                         "fr_url": f"https://www.federalregister.gov/d/{granule_id}"

@@ -1,7 +1,7 @@
 ---
 name: tax-advisor
 description: Tax optimization specialist for investment decisions
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__portfolio-state-server__simulate_sale, mcp__portfolio-state-server__get_tax_loss_harvesting_opportunities, mcp__tax-server__calculate_comprehensive_tax, mcp__tax-optimization-server__find_tax_loss_harvesting_pairs, mcp__openbb-curated__regulators_sec_cik_map, mcp__openbb-curated__regulators_sec_symbol_map, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__portfolio-state-server__simulate_sale, mcp__portfolio-state-server__get_tax_loss_harvesting_opportunities, mcp__tax-server__calculate_comprehensive_tax, mcp__tax-optimization-server__find_tax_loss_harvesting_pairs, mcp__openbb-curated__regulators_sec_cik_map, mcp__openbb-curated__regulators_sec_symbol_map, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, WebSearch, WebFetch, LS, Read, Write
 model: sonnet
 ---
 

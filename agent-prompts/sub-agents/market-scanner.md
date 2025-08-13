@@ -1,7 +1,7 @@
 ---
 name: market-scanner
 description: Multi-asset market monitoring and news analysis
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, mcp__openbb-curated__regulators_sec_rss_litigation, mcp__openbb-curated__equity_discovery_filings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, mcp__openbb-curated__regulators_sec_rss_litigation, mcp__openbb-curated__equity_fundamental_filings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, WebSearch, WebFetch, LS, Read, Write
 model: sonnet
 ---
 
@@ -45,7 +45,7 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 **CORRECT - Integers without quotes:**
 ```python
 mcp__openbb-curated__news_company(symbol="AAPL", limit=20)
-mcp__openbb-curated__equity_discovery_filings(limit=10)
+mcp__openbb-curated__equity_fundamental_filings(symbol="SPY", provider="sec", limit=10)
 mcp__openbb-curated__regulators_sec_rss_litigation()
 ```
 
@@ -57,7 +57,7 @@ mcp__openbb-curated__news_company(limit="20")  # ❌ FAILS
 **Available tools for market monitoring:**
 - `news_company`: Company-specific news (use limit=20, provider="yfinance")
 - `regulators_sec_rss_litigation`: SEC enforcement and litigation news
-- `equity_discovery_filings`: Recent SEC filings across market
+- `equity_fundamental_filings`: Recent SEC filings for specific tickers
 - WebSearch: Fallback for broader market news
 
 ## Scanning Framework

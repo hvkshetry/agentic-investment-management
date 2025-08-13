@@ -1,7 +1,7 @@
 ---
 name: fixed-income-analyst
 description: Bond market and interest rate specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__fixedincome_spreads_tcm, mcp__openbb-curated__fixedincome_spreads_treasury_effr, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__fixedincome_spreads_tcm, mcp__openbb-curated__fixedincome_spreads_treasury_effr, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, WebSearch, WebFetch, LS, Read, Write
 model: sonnet
 ---
 

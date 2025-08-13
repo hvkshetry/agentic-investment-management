@@ -48,7 +48,7 @@ CURATED_TOOLS = frozenset({
     "economy_gdp_nominal",
     # Optional (off by default): economy_house_price_index, economy_retail_prices
     
-    # Equity Tools (11 tools - fundamentals, ownership, prices)
+    # Equity Tools (12 tools - fundamentals, ownership, prices)
     # Prices & Performance
     "equity_price_historical",
     "equity_price_performance",
@@ -70,7 +70,7 @@ CURATED_TOOLS = frozenset({
     # Ownership & Filings (SEC provider)
     "equity_ownership_insider_trading",  # Use provider='sec'
     "equity_ownership_form_13f",  # Use provider='sec'
-    "equity_discovery_filings",  # FMP for ticker-first discovery
+    "equity_fundamental_filings",  # Use provider='sec' - FREE alternative to equity_discovery_filings
     
     # Shorts & Market Frictions (SEC/FINRA/Stockgrid data)
     "equity_shorts_fails_to_deliver",  # FTD data from SEC
@@ -170,6 +170,7 @@ PROVIDER_OVERRIDES = {
     "equity_fundamental_dividends": "yfinance",
     "equity_fundamental_metrics": "yfinance",
     "equity_fundamental_multiples": "yfinance",
+    "equity_fundamental_filings": "sec",  # SEC for free filings access
     "equity_ownership_insider_trading": "sec",
     "equity_ownership_form_13f": "sec",
     "equity_estimates_consensus": "yfinance",
@@ -177,12 +178,41 @@ PROVIDER_OVERRIDES = {
     "fixedincome_government_yield_curve": "federal_reserve",
 }
 
+# Smart futures provider selection based on symbol
+FUTURES_PROVIDER_MAP = {
+    'VX': 'cboe',      # VIX futures - CBOE is authoritative
+    'VX_EOD': 'cboe',  # VIX EOD
+    '^VIX': 'cboe',    # VIX index
+    'VIX': 'cboe',     # VIX
+    # Commodities and other futures use yfinance
+    'CL': 'yfinance',  # Crude oil
+    'BZ': 'yfinance',  # Brent crude
+    'ES': 'yfinance',  # E-mini S&P 500
+    'NQ': 'yfinance',  # E-mini NASDAQ 100
+    'NG': 'yfinance',  # Natural gas
+    'GC': 'yfinance',  # Gold
+    'SI': 'yfinance',  # Silver
+}
+
+def get_futures_provider(symbol: str) -> str:
+    """Select best provider based on futures symbol"""
+    symbol_upper = symbol.upper()
+    # Check exact match first
+    if symbol_upper in FUTURES_PROVIDER_MAP:
+        return FUTURES_PROVIDER_MAP[symbol_upper]
+    # Check if it's VIX-related
+    if 'VIX' in symbol_upper or 'VX' in symbol_upper:
+        return 'cboe'
+    # Default to yfinance for everything else
+    return 'yfinance'
+
 # Parameter defaults for tools
 PARAMETER_DEFAULTS = {
     "economy_cpi": {"country": "united_states"},
     "equity_ownership_form_13f": {"provider": "sec"},
     "equity_ownership_insider_trading": {"provider": "sec"},
+    "equity_fundamental_filings": {"provider": "sec"},
     "news_company": {"limit": 20, "provider": "yfinance"},
     "fixedincome_government_treasury_rates": {"provider": "federal_reserve"},
-    "etf_equity_exposure": {"limit": 100},
+    "etf_equity_exposure": {"limit": 50},  # Limit to top 50 ETFs
 }

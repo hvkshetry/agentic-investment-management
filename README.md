@@ -67,12 +67,18 @@ Server    Opt v3     Server    Server (Oracle)
 - **Trust & Estate Support**: Specialized entity calculations
 - **NIIT & AMT**: Advanced tax scenario modeling
 
-### Market Data (60+ OpenBB Tools)
-- **Equities**: Fundamentals, ownership, analyst estimates
-- **Fixed Income**: Treasury rates, yield curves, spreads
-- **Economics**: GDP, inflation, employment, trade data
-- **ETFs**: Holdings, performance, expense analysis
-- **Derivatives**: Options chains, futures curves
+### Market Data (44 Curated OpenBB Tools)
+- **Equities**: Fundamentals, SEC filings (FREE), ownership, analyst estimates
+- **Fixed Income**: Treasury rates, yield curves, spreads (federal_reserve provider)
+- **Economics**: GDP, inflation, employment (OECD/FRED providers)
+- **ETFs**: Holdings, sectors, equity exposure analysis
+- **Derivatives**: Options chains, futures curves (CBOE for VIX, yfinance for commodities)
+
+### Policy Events Monitoring (Dynamic Congress Support)
+- **Congressional Bills**: Auto-detects current 119th Congress (2025-2026)
+- **Federal Rules**: Real-time Federal Register documents with full content
+- **Committee Hearings**: Enhanced metadata including time, location, witnesses
+- **Two-Stage Pattern**: Bulk retrieval → LLM analysis → Detail fetching
 
 ## 🚀 Claude Code Configuration
 
@@ -146,6 +152,15 @@ Create or update `~/.claude/settings.json` (Windows: `C:\Users\[username]\.claud
         "--transport", "stdio",
         "--no-tool-discovery"
       ]
+    },
+    "policy-events-service": {
+      "type": "stdio",
+      "command": "wsl",
+      "args": [
+        "-d", "Ubuntu",
+        "/home/[username]/investing/openbb/bin/python",
+        "/home/[username]/investing/policy-events-mcp-server/server.py"
+      ]
     }
   }
 }
@@ -202,6 +217,24 @@ Create `~/.openbb_platform/user_settings.json`:
 - **Risk Analytics**: Multiple VaR methods, stress testing, Monte Carlo
 - **Token Optimized**: ~45% reduction in prompt tokens for efficiency
 
+## 🎯 Recent Improvements (August 2025)
+
+### Fixed Issues
+- ✅ **Congress API**: Dynamic detection of current 119th Congress (was hardcoded to 118th)
+- ✅ **Tax Server**: Direct portfolio state file access (fixed MCP client nesting issue)
+- ✅ **Token Limits**: Response limiter prevents >25k token responses
+- ✅ **SEC Filings**: Replaced FMP-only tool with free SEC provider alternative
+- ✅ **Futures Data**: Smart provider selection (CBOE for VIX, yfinance for commodities)
+- ✅ **News Tools**: Fixed parameter validation and default limits
+- ✅ **Federal Rules**: Enhanced with actual content from Federal Register API
+- ✅ **Hearings**: Added time, location, and congress metadata
+
+### Key Enhancements
+- **Response Limiting**: Automatic pagination for large datasets (ETF exposure, company facts)
+- **Provider Optimization**: Free providers configured as defaults throughout
+- **Date Filtering**: Automatic date ranges for treasury/spread endpoints
+- **Content Fetching**: Federal rules now include abstracts, CFR references, significance flags
+
 ## 🧪 Testing
 
 ```bash
@@ -240,38 +273,39 @@ python -m pytest test_all_fixes.py -v
 
 ```
 investing/
-├── portfolio-state-mcp-server/  # Central data hub (NEW)
+├── portfolio-state-mcp-server/  # Central data hub
 │   ├── portfolio_state_server.py
-│   ├── parsers/                 # CSV parsers for brokers
-│   └── state/                   # Portfolio state storage
-├── risk-mcp-server/             # Risk analysis (v3 - integrated)
+│   ├── csv_parsers/            # CSV parsers for brokers
+│   └── state/                  # Portfolio state storage
+├── risk-mcp-server/            # Risk analysis (v3 - integrated)
 │   └── risk_mcp_server_v3.py
-├── portfolio-mcp-server/        # Portfolio optimization (v3 - integrated)
+├── portfolio-mcp-server/       # Portfolio optimization (v3 - integrated)
 │   └── portfolio_mcp_server_v3.py
-├── tax-mcp-server/              # Tax calculations (v2 - integrated)
+├── tax-mcp-server/             # Tax calculations (v2 - integrated)
 │   └── tax_mcp_server_v2.py
-├── tax-optimization-mcp-server/ # Oracle-powered tax optimization (NEW)
-│   └── tax_optimization_server.py
-├── oracle/                      # Oracle optimization engine
+├── tax-optimization-mcp-server/ # Oracle-powered tax optimization
+│   └── tax_optimization_server.py # Fixed direct file access
+├── policy-events-mcp-server/   # Policy monitoring (119th Congress)
+│   ├── server.py               # FastMCP server
+│   ├── congress_bulk.py        # Dynamic congress detection
+│   └── govinfo_bulk.py         # Federal Register with content
+├── openbb-mcp-customizations/  # OpenBB enhancements
+│   ├── openbb_mcp_server/
+│   │   ├── curated_tools.py   # 44 tools with smart providers
+│   │   └── response_limiter.py # Token overflow prevention
+│   └── OPENBB_TOOL_PARAMETERS.md
+├── oracle/                     # Oracle optimization engine
 │   └── src/service/oracle.py
-├── shared/                      # Common utilities and libraries
-│   ├── backtesting/            # bt library integration (NEW)
-│   │   ├── bt_engine.py       # Mechanical strategy execution
-│   │   └── strategies.py      # Strategy definitions
-│   ├── validation/             # Validation frameworks (NEW)
-│   │   ├── walk_forward.py    # Walk-forward validation
-│   │   ├── cross_validation.py # Combinatorial purged CV
-│   │   └── metrics.py         # Performance metrics
-│   ├── optimization/           # Advanced optimization (NEW)
-│   │   ├── multi_period.py    # Multi-period tax-aware
-│   │   ├── views_entropy.py   # Entropy pooling & Black-Litterman
-│   │   └── quantum.py         # Quantum-inspired optimization
-│   ├── data_pipeline.py       # Market data processing
-│   └── confidence_scoring.py  # Confidence metrics
-├── agent-prompts/               # Claude Code agent system prompts
-│   ├── CLAUDE.md               # Main orchestrator
-│   └── sub-agents/             # 9 specialized analysts
-└── test_integrated_system.py   # Integration test suite
+├── shared/                     # Common utilities and libraries
+│   ├── backtesting/           # bt library integration
+│   ├── validation/            # Walk-forward, cross-validation
+│   ├── optimization/          # Multi-period, Black-Litterman
+│   ├── data_pipeline.py      # Market data processing
+│   └── confidence_scoring.py # Confidence metrics
+├── agent-prompts/             # Claude Code agent system prompts
+│   ├── CLAUDE.md             # Main orchestrator (updated)
+│   └── sub-agents/           # 9 specialized analysts (all updated)
+└── test_results/             # Comprehensive test results
 ```
 
 ## 🔒 Security

@@ -80,16 +80,24 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 
 ## Agent Coordination
 
+### Session Management (CRITICAL)
+**When dispatching agents, the orchestrator MUST:**
+1. Create ONE session directory at workflow start: `./runs/YYYYMMDD_HHMMSS/`
+2. Pass this SAME directory path to ALL agents in the workflow
+3. Instruct each agent to use this specific directory for reading AND writing
+4. Example: "Use session directory ./runs/20250813_143022/ for all artifacts"
+
 ### Cross-Agent Communication (MANDATORY)
 **Each agent MUST:**
-1. Check if run directory exists: `./runs/<current_timestamp>/`
-2. Read existing artifacts from other agents
-3. Build on previous analyses, don't duplicate work
-4. Write their own artifacts for downstream agents
+1. Use the session directory provided by orchestrator (NOT create their own)
+2. Check for existing artifacts: `ls ./runs/<session_timestamp>/`
+3. Read ALL existing artifacts from other agents in SAME session
+4. Build on previous analyses, don't duplicate work
+5. Write their own artifacts to the SAME session directory
 
 **Artifact Reading Order:**
 1. Portfolio State → All agents
-2. Macro Context → Risk, Portfolio Manager
+2. Macro Context → Risk, Portfolio Manager  
 3. Risk Analysis → Portfolio Manager, Tax Advisor
 4. Optimization Results → Tax Advisor
 5. Tax Impact → Final decision
@@ -137,14 +145,20 @@ When calling ANY MCP tool, pass parameters as NATIVE types, NOT JSON strings:
 
 ### Every workflow MUST:
 1. Begin with `mcp__portfolio-state-server__get_portfolio_state` 
-2. Create run directory: `./runs/<timestamp>/`
-3. Each agent MUST write artifacts using Write tool:
-   - Risk Analyst: `./runs/<timestamp>/risk_analysis.json`
-   - Portfolio Manager: `./runs/<timestamp>/optimization_results.json`
-   - Tax Advisor: `./runs/<timestamp>/tax_impact.json`
-   - Macro Analyst: `./runs/<timestamp>/macro_context.json`
-4. Agents MUST read previous artifacts before analysis
-5. Use standardized JSON envelope:
+2. Create ONE run directory per session: `./runs/<YYYYMMDD_HHMMSS>/` (e.g., `./runs/20250813_143022/`)
+3. ALL agents in the same workflow MUST use the SAME timestamp directory
+4. Each agent MUST write artifacts using Write tool to the SHARED session directory:
+   - Risk Analyst: `./runs/<session_timestamp>/risk_analysis.json`
+   - Portfolio Manager: `./runs/<session_timestamp>/optimization_results.json`
+   - Tax Advisor: `./runs/<session_timestamp>/tax_impact.json`
+   - Macro Analyst: `./runs/<session_timestamp>/macro_context.json`
+   - Equity Analyst: `./runs/<session_timestamp>/equity_analysis.json`
+   - Market Scanner: `./runs/<session_timestamp>/market_scan.json`
+   - Derivatives Analyst: `./runs/<session_timestamp>/options_analysis.json`
+   - Fixed Income Analyst: `./runs/<session_timestamp>/fixed_income_analysis.json`
+   - ETF Analyst: `./runs/<session_timestamp>/etf_analysis.json`
+5. Agents MUST read ALL previous artifacts from the SAME session directory before analysis
+6. Use standardized JSON envelope:
 
 ```json
 {
@@ -204,9 +218,9 @@ mcp__portfolio-state-server__get_portfolio_state()
 - **Safe**: Can't accidentally accumulate duplicate positions
 - **Clear**: Server restart = fresh portfolio state
 
-## CRITICAL: OpenBB Tool Parameters (43 Curated Tools)
+## CRITICAL: OpenBB Tool Parameters (44 Curated Tools)
 
-**OpenBB MCP Server has 43 carefully curated tools** (reduced from 65+ for context efficiency).
+**OpenBB MCP Server has 44 carefully curated tools** (reduced from 65+ for context efficiency).
 
 ### Key Provider Requirements:
 - **Equity estimates**: Use `provider="yfinance"` for FREE consensus data
@@ -232,20 +246,21 @@ mcp__portfolio-state-server__get_portfolio_state()
 **IMPORTANT: No pre-filtering - LLM decides relevance**
 
 ### Stage 1 - Bulk Retrieval (Unfiltered):
-- `get_recent_bills(days_back, max_results)`: ALL congressional bills
+- `get_recent_bills(days_back, max_results)`: ALL congressional bills (119th Congress auto-detected)
 - `get_federal_rules(days_back, days_ahead, max_results)`: ALL Federal Register documents  
-- `get_upcoming_hearings(days_ahead, max_results)`: ALL congressional hearings
+- `get_upcoming_hearings(days_ahead, max_results)`: ALL congressional hearings with enhanced metadata
 
 ### Stage 2 - Detail Retrieval (After LLM Analysis):
 - `get_bill_details(bill_ids)`: Full details for LLM-selected bills
-- `get_rule_details(document_numbers)`: Full details for LLM-selected rules
+- `get_rule_details(document_numbers)`: Full details with Federal Register API content
 - `get_hearing_details(event_ids)`: Full details for LLM-selected hearings
 
 **Design Philosophy:**
 - Returns ALL data without filtering (no materiality thresholds)
 - LLM analyzes bulk results to identify relevant items
 - Details fetched only for LLM-selected items
-- Fails loudly with real errors (no mock data)
+- Dynamic congress detection (currently 119th: 2025-2026)
+- Federal rules include abstracts, CFR references, significance flags
 
 ## SEC/EDGAR Tools for Authoritative Data
 
@@ -255,7 +270,7 @@ mcp__portfolio-state-server__get_portfolio_state()
 - `regulators_sec_filing_headers`: Fast form classification without full download
 - `regulators_sec_htm_file`: Source HTML for LLM parsing
 - `regulators_sec_rss_litigation`: Enforcement & litigation feed
-- `equity_discovery_filings`: Ticker-first filing discovery (FMP)
+- `equity_fundamental_filings`: SEC filings for any ticker (provider='sec', FREE)
 
 ### Mapping & Lookup:
 - `regulators_sec_cik_map`: CIK to ticker mapping

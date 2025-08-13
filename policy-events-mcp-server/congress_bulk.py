@@ -10,6 +10,33 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def get_current_congress():
+    """Calculate current Congress number based on date.
+    
+    Congress changes every 2 years on January 3rd.
+    119th Congress: 2025-2026
+    118th Congress: 2023-2024
+    """
+    current_date = datetime.now()
+    current_year = current_date.year
+    
+    # Congress starts on January 3rd of odd years
+    # If we're before January 3rd of an odd year, we're still in the previous congress
+    if current_date.month == 1 and current_date.day < 3 and current_year % 2 == 1:
+        effective_year = current_year - 1
+    else:
+        effective_year = current_year
+    
+    # Calculate congress number
+    # First Congress was 1789-1791
+    base_year = 1789
+    base_congress = 1
+    
+    # Each Congress spans 2 years
+    congress_number = base_congress + ((effective_year - base_year) // 2)
+    
+    return congress_number
+
 class CongressBulkClient:
     """Lightweight Congress.gov API client"""
     
@@ -101,8 +128,9 @@ class CongressBulkClient:
         hearings = []
         
         # Get hearings from both chambers
+        current_congress = get_current_congress()
         for chamber in ["house", "senate"]:
-            endpoint = f"/committee-meeting/118/{chamber}"
+            endpoint = f"/committee-meeting/{current_congress}/{chamber}"
             params = {
                 "limit": min(max_results // 2, 100),  # Split between chambers
                 "format": "json"
@@ -119,7 +147,7 @@ class CongressBulkClient:
                 response.raise_for_status()
                 data = response.json()
                 
-                # Extract minimal hearing info
+                # Extract minimal hearing info with enhanced metadata
                 for meeting in data.get("committeeMeetings", []):
                     hearings.append({
                         "event_id": meeting.get("eventId"),
@@ -127,6 +155,9 @@ class CongressBulkClient:
                         "title": meeting.get("title", ""),
                         "committee": meeting.get("committees", [{}])[0].get("name", "") if meeting.get("committees") else "",
                         "date": meeting.get("date", ""),
+                        "time": meeting.get("time", ""),  # Add time field
+                        "location": meeting.get("location", ""),  # Add location
+                        "congress": current_congress,  # Add congress number
                         "url": meeting.get("url", "")
                     })
                     
@@ -159,8 +190,9 @@ class CongressBulkClient:
                 bill_type = parts[0].lower()
                 bill_number = parts[1]
                 
-                # Assume current congress (118)
-                endpoint = f"/bill/118/{bill_type}/{bill_number}"
+                # Use current congress dynamically
+                current_congress = get_current_congress()
+                endpoint = f"/bill/{current_congress}/{bill_type}/{bill_number}"
                 params = {"format": "json"}
                 
                 if self.api_key:
@@ -176,7 +208,7 @@ class CongressBulkClient:
                 bill = data.get("bill", {})
                 
                 # Get committees
-                committees_endpoint = f"/bill/118/{bill_type}/{bill_number}/committees"
+                committees_endpoint = f"/bill/{current_congress}/{bill_type}/{bill_number}/committees"
                 committees_response = await self.session.get(
                     f"{self.BASE_URL}{committees_endpoint}",
                     params=params
@@ -184,7 +216,7 @@ class CongressBulkClient:
                 committees_data = committees_response.json() if committees_response.status_code == 200 else {}
                 
                 # Get text/summary
-                text_endpoint = f"/bill/118/{bill_type}/{bill_number}/text"
+                text_endpoint = f"/bill/{current_congress}/{bill_type}/{bill_number}/text"
                 text_response = await self.session.get(
                     f"{self.BASE_URL}{text_endpoint}",
                     params=params
@@ -200,7 +232,7 @@ class CongressBulkClient:
                     "committees": committees_data.get("committees", []),
                     "actions": bill.get("actions", {}).get("item", [])[:10] if bill.get("actions") else [],
                     "text_versions": text_data.get("textVersions", []),
-                    "congress_url": f"https://www.congress.gov/bill/118th-congress/{bill_type.replace('res', '-resolution')}/{bill_number}"
+                    "congress_url": f"https://www.congress.gov/bill/{current_congress}th-congress/{bill_type.replace('res', '-resolution')}/{bill_number}"
                 })
                 
             except Exception as e:
@@ -223,9 +255,10 @@ class CongressBulkClient:
         
         for event_id in event_ids:
             # Try both chambers since we don't know which one
+            current_congress = get_current_congress()
             for chamber in ["house", "senate"]:
                 try:
-                    endpoint = f"/committee-meeting/118/{chamber}/{event_id}"
+                    endpoint = f"/committee-meeting/{current_congress}/{chamber}/{event_id}"
                     params = {"format": "json"}
                     
                     if self.api_key:
@@ -249,7 +282,8 @@ class CongressBulkClient:
                             "type": meeting.get("type", ""),
                             "witnesses": meeting.get("witnesses", []),
                             "documents": meeting.get("documents", []),
-                            "url": f"https://www.congress.gov/committee-meeting/118/{chamber}/{event_id}"
+                            "congress": current_congress,
+                            "url": f"https://www.congress.gov/committee-meeting/{current_congress}/{chamber}/{event_id}"
                         })
                         break  # Found in this chamber, don't check the other
                         

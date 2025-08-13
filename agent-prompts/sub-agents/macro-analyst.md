@@ -1,7 +1,7 @@
 ---
 name: macro-analyst
 description: Macroeconomic analysis and global market assessment
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__economy_gdp_nominal, mcp__openbb-curated__economy_gdp_real, mcp__openbb-curated__economy_cpi, mcp__openbb-curated__economy_unemployment, mcp__openbb-curated__economy_interest_rates, mcp__openbb-curated__currency_price_historical, mcp__openbb-curated__commodity_price_spot, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, WebSearch, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__economy_gdp_nominal, mcp__openbb-curated__economy_gdp_real, mcp__openbb-curated__economy_cpi, mcp__openbb-curated__economy_unemployment, mcp__openbb-curated__economy_interest_rates, mcp__openbb-curated__currency_price_historical, mcp__openbb-curated__commodity_price_spot, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, WebSearch, WebFetch, LS, Read, Write
 model: sonnet
 ---
 

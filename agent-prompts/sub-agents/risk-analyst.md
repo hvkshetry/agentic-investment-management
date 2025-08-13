@@ -1,7 +1,7 @@
 ---
 name: risk-analyst
 description: Risk measurement and hedging strategy specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__risk-server__analyze_portfolio_risk, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__risk-server__analyze_portfolio_risk, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, WebSearch, WebFetch, LS, Read, Write
 model: sonnet
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: equity-analyst
 description: Equity research and fundamental analysis specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__equity_estimates_consensus, mcp__openbb-curated__equity_discovery_filings, mcp__openbb-curated__equity_fundamental_multiples, mcp__openbb-curated__equity_fundamental_balance, mcp__openbb-curated__equity_fundamental_cash, mcp__openbb-curated__equity_fundamental_dividends, mcp__openbb-curated__equity_fundamental_income, mcp__openbb-curated__equity_fundamental_metrics, mcp__openbb-curated__equity_fundamental_management_discussion_analysis, mcp__openbb-curated__equity_ownership_insider_trading, mcp__openbb-curated__equity_ownership_form_13f, mcp__openbb-curated__equity_price_historical, mcp__openbb-curated__equity_price_performance, mcp__openbb-curated__equity_profile, mcp__openbb-curated__equity_compare_company_facts, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__openbb-curated__regulators_sec_filing_headers, mcp__openbb-curated__regulators_sec_htm_file, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__equity_estimates_consensus, mcp__openbb-curated__equity_fundamental_filings, mcp__openbb-curated__equity_fundamental_multiples, mcp__openbb-curated__equity_fundamental_balance, mcp__openbb-curated__equity_fundamental_cash, mcp__openbb-curated__equity_fundamental_dividends, mcp__openbb-curated__equity_fundamental_income, mcp__openbb-curated__equity_fundamental_metrics, mcp__openbb-curated__equity_fundamental_management_discussion_analysis, mcp__openbb-curated__equity_ownership_insider_trading, mcp__openbb-curated__equity_ownership_form_13f, mcp__openbb-curated__equity_price_historical, mcp__openbb-curated__equity_price_performance, mcp__openbb-curated__equity_profile, mcp__openbb-curated__equity_compare_company_facts, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__openbb-curated__regulators_sec_filing_headers, mcp__openbb-curated__regulators_sec_htm_file, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, WebSearch, WebFetch, LS, Read, Write
 model: sonnet
 ---
 
@@ -68,14 +68,14 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 
 **CORRECT - Integers without quotes:**
 ```python
-mcp__openbb-curated__equity_discovery_filings(symbol="AAPL", limit=10)
+mcp__openbb-curated__equity_fundamental_filings(symbol="AAPL", provider="sec", limit=10)
 mcp__openbb-curated__equity_fundamental_metrics(symbol="AAPL", provider="yfinance")
 mcp__openbb-curated__equity_ownership_form_13f(symbol="AAPL", provider="sec")
 ```
 
 **WRONG - Never use quotes for numbers:**
 ```python
-mcp__openbb-curated__equity_discovery_filings(limit="10")  # ❌ FAILS
+mcp__openbb-curated__equity_fundamental_filings(limit="10", provider="sec")  # ❌ FAILS - limit must be integer
 ```
 
 **Quick Reference:**
