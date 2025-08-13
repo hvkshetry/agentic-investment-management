@@ -1,7 +1,7 @@
 ---
 name: fixed-income-analyst
 description: Bond market and interest rate specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__fixedincome_spreads_tcm, mcp__openbb-curated__fixedincome_spreads_treasury_effr, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__policy-events-service__monitor_key_nominations, mcp__policy-events-service__monitor_key_hearings, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__fixedincome_spreads_tcm, mcp__openbb-curated__fixedincome_spreads_treasury_effr, mcp__openbb-curated__fixedincome_government_yield_curve, mcp__openbb-curated__fixedincome_government_treasury_rates, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -151,12 +151,12 @@ Position for rate environment:
 
 ## Policy Event Monitoring
 
-**Fed Nominations:** `mcp__policy-events-service__monitor_key_nominations`
+**Fed Nominations:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
 - positions=["Federal Reserve", "Treasury Secretary"]
 - Confirmation changes rate path expectations
 - Check confirmation_probability for timing
 
-**FOMC Hearings:** `mcp__policy-events-service__monitor_key_hearings`
+**FOMC Hearings:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
 - Filter for "Federal Reserve" in key_officials
 - binary_event_date = known vol expansion
 - Hawkish/dovish signals move entire curve

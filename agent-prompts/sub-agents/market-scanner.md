@@ -1,7 +1,7 @@
 ---
 name: market-scanner
 description: Multi-asset market monitoring and news analysis
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, mcp__openbb-curated__regulators_sec_rss_litigation, mcp__openbb-curated__equity_discovery_filings, mcp__policy-events-service__track_material_bills, mcp__policy-events-service__monitor_key_hearings, mcp__policy-events-service__watch_federal_rules, mcp__policy-events-service__track_congressional_trades, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__news_company, mcp__openbb-curated__crypto_price_historical, mcp__openbb-curated__index_price_historical, mcp__openbb-curated__regulators_sec_rss_litigation, mcp__openbb-curated__equity_discovery_filings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -136,6 +136,30 @@ Track non-traditional indicators:
 - Credit spreads widening
 - Defensive sectors leading
 - Crypto selling off
+
+## Policy Event Monitoring (Two-Stage Sieve)
+
+### Stage 1 - Scan ALL Policy Events (No Filtering):
+```python
+# Get ALL recent bills
+bills = mcp__policy-events-service__get_recent_bills(days_back=7, max_results=100)
+# Get ALL upcoming hearings  
+hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=7, max_results=50)
+# Get ALL federal rules
+rules = mcp__policy-events-service__get_federal_rules(days_back=7, days_ahead=7, max_results=100)
+```
+
+### Stage 2 - YOU Identify Market-Moving Events:
+- Analyze bulk results for market impact
+- Look for: Fed hearings, tax bills, regulatory changes
+- Get details ONLY for relevant items:
+```python
+# After YOUR analysis identifies important items
+details = mcp__policy-events-service__get_bill_details(["HR-1234", "S-567"])
+hearing_info = mcp__policy-events-service__get_hearing_details(["116264"])
+```
+
+**Remember: The tools return EVERYTHING - YOU decide what matters for markets**
 
 ## Warning Signals
 

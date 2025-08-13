@@ -1,7 +1,7 @@
 ---
 name: tax-advisor
 description: Tax optimization specialist for investment decisions
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__portfolio-state-server__simulate_sale, mcp__portfolio-state-server__get_tax_loss_harvesting_opportunities, mcp__tax-server__calculate_comprehensive_tax, mcp__tax-optimization-server__find_tax_loss_harvesting_pairs, mcp__openbb-curated__regulators_sec_cik_map, mcp__openbb-curated__regulators_sec_symbol_map, mcp__policy-events-service__track_material_bills, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__portfolio-state-server__simulate_sale, mcp__portfolio-state-server__get_tax_loss_harvesting_opportunities, mcp__tax-server__calculate_comprehensive_tax, mcp__tax-optimization-server__find_tax_loss_harvesting_pairs, mcp__openbb-curated__regulators_sec_cik_map, mcp__openbb-curated__regulators_sec_symbol_map, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -175,7 +175,7 @@ For ALL tax analyses, generate: `/reports/Tax_Analysis_[Topic]_[YYYY-MM-DD].md`
 
 ## Tax Reform Monitoring
 
-**Material Bills:** `mcp__policy-events-service__track_material_bills`
+**Material Bills:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
 - committees=["ways_and_means", "finance"] for tax legislation
 - min_materiality=7 for major tax code changes
 - Check affected_sectors="tax_policy" in response

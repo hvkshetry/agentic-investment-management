@@ -1,0 +1,26 @@
+{
+  "track_material_bills": {
+    "status": "FAILED",
+    "error": "Invalid response type: <class 'fastmcp.client.client.CallToolResult'>"
+  },
+  "monitor_key_hearings": {
+    "status": "FAILED",
+    "error": "Error calling tool 'monitor_key_hearings': CRITICAL: Congress API request failed - Client error '429 Too Many Requests' for url 'https://api.congress.gov/v3/committee-meeting/118/house?format=json&limit=100&api_key=DEMO_KEY'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429 - URL: https://api.congress.gov/v3/committee-meeting/118/house"
+  },
+  "watch_federal_rules": {
+    "status": "FAILED",
+    "error": "Error calling tool 'watch_federal_rules': RATE LIMIT: GovInfo API rate limit hit. Retry after 6226 seconds"
+  },
+  "track_congressional_trades": {
+    "status": "FAILED",
+    "error": "Error calling tool 'track_congressional_trades': CRITICAL: Failed to fetch Senate reports - Client error '403 Forbidden' for url 'https://efdsearch.senate.gov/search/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403"
+  },
+  "monitor_key_nominations": {
+    "status": "FAILED",
+    "error": "Error calling tool 'monitor_key_nominations': CRITICAL: Congress API request failed - Client error '429 Too Many Requests' for url 'https://api.congress.gov/v3/nomination/118?format=json&limit=100&api_key=DEMO_KEY'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429 - URL: https://api.congress.gov/v3/nomination/118"
+  },
+  "track_rin_lifecycle": {
+    "status": "FAILED",
+    "error": "Error calling tool 'track_rin_lifecycle': RATE LIMIT: GovInfo API rate limit hit. Retry after 6224 seconds"
+  }
+}

@@ -1,7 +1,7 @@
 ---
 name: risk-analyst
 description: Risk measurement and hedging strategy specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__risk-server__analyze_portfolio_risk, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__policy-events-service__watch_federal_rules, mcp__policy-events-service__track_material_bills, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__risk-server__analyze_portfolio_risk, mcp__openbb-curated__derivatives_options_chains, mcp__openbb-curated__derivatives_futures_curve, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_bill_details, mcp__policy-events-service__get_rule_details, mcp__policy-events-service__get_hearing_details, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -130,17 +130,25 @@ Standard scenarios applied:
 }
 ```
 
-## Regulatory Risk Monitoring
+## Regulatory Risk Monitoring (Two-Stage Sieve)
 
-**Final Rules:** `mcp__policy-events-service__watch_federal_rules`
-- rule_type="final" for compliance requirements
-- Check effective_date for implementation timeline
-- affected_industries maps to portfolio sectors
+**Stage 1 - Get ALL Policy Events:**
+```python
+# No filtering - get everything
+rules = get_federal_rules(days_back=30, days_ahead=30, max_results=200)
+bills = get_recent_bills(days_back=30, max_results=200)
+```
 
-**Material Bills:** `mcp__policy-events-service__track_material_bills`
-- min_materiality=7 for systemic risk changes
-- status="ENACTED" = immediate implementation
-- committees=["banking", "finance"] for financial regulation
+**Stage 2 - YOU Identify Risk-Relevant Items:**
+- Analyze for: Basel III, Dodd-Frank, margin requirements
+- Look for effective dates affecting portfolio
+- Then get details:
+```python
+get_rule_details(["2025-15325"])  # For identified rules
+get_bill_details(["HR-1234"])     # For identified bills
+```
+
+**Remember: Tools return EVERYTHING - YOU decide risk relevance**
 
 ## Report Generation
 

@@ -1,7 +1,7 @@
 ---
 name: equity-analyst
 description: Equity research and fundamental analysis specialist
-tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__equity_estimates_consensus, mcp__openbb-curated__equity_discovery_filings, mcp__openbb-curated__equity_fundamental_multiples, mcp__openbb-curated__equity_fundamental_balance, mcp__openbb-curated__equity_fundamental_cash, mcp__openbb-curated__equity_fundamental_dividends, mcp__openbb-curated__equity_fundamental_income, mcp__openbb-curated__equity_fundamental_metrics, mcp__openbb-curated__equity_fundamental_management_discussion_analysis, mcp__openbb-curated__equity_ownership_insider_trading, mcp__openbb-curated__equity_ownership_form_13f, mcp__openbb-curated__equity_price_historical, mcp__openbb-curated__equity_price_performance, mcp__openbb-curated__equity_profile, mcp__openbb-curated__equity_compare_company_facts, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__openbb-curated__regulators_sec_filing_headers, mcp__openbb-curated__regulators_sec_htm_file, mcp__policy-events-service__track_congressional_trades, mcp__policy-events-service__monitor_key_hearings, mcp__policy-events-service__track_material_bills, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
+tools: mcp__portfolio-state-server__get_portfolio_state, mcp__openbb-curated__equity_estimates_consensus, mcp__openbb-curated__equity_discovery_filings, mcp__openbb-curated__equity_fundamental_multiples, mcp__openbb-curated__equity_fundamental_balance, mcp__openbb-curated__equity_fundamental_cash, mcp__openbb-curated__equity_fundamental_dividends, mcp__openbb-curated__equity_fundamental_income, mcp__openbb-curated__equity_fundamental_metrics, mcp__openbb-curated__equity_fundamental_management_discussion_analysis, mcp__openbb-curated__equity_ownership_insider_trading, mcp__openbb-curated__equity_ownership_form_13f, mcp__openbb-curated__equity_price_historical, mcp__openbb-curated__equity_price_performance, mcp__openbb-curated__equity_profile, mcp__openbb-curated__equity_compare_company_facts, mcp__openbb-curated__equity_shorts_fails_to_deliver, mcp__openbb-curated__equity_shorts_short_interest, mcp__openbb-curated__equity_shorts_short_volume, mcp__openbb-curated__regulators_sec_filing_headers, mcp__openbb-curated__regulators_sec_htm_file, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings, WebSearch, mcp__sequential-thinking__sequentialthinking, LS, Read, Write
 model: sonnet
 ---
 
@@ -31,16 +31,16 @@ If extracting from another tool's output, convert strings to native types first.
 
 ## Policy Signal Tracking
 
-**Congressional Trades:** `mcp__policy-events-service__track_congressional_trades`
+**Congressional Trades:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
 - Check min_amount=50000 for high-conviction trades
 - unusual_activity=true flags sector clustering
 - Match ticker to portfolio holdings for follow signals
 
-**CEO Hearings:** `mcp__policy-events-service__monitor_key_hearings`
+**CEO Hearings:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
 - Filter for CEO testimony in affected_sectors
 - Binary event if antitrust or regulatory focus
 
-**Sector Bills:** `mcp__policy-events-service__track_material_bills`
+**Sector Bills:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
 - Check affected_sectors matches holdings
 - min_materiality=6 for actionable signals
 - status="PASSED_HOUSE" or "PASSED_SENATE" = imminent

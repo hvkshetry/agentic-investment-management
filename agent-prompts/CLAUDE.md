@@ -17,7 +17,7 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 **Use For:** Stock analysis, sector comparisons, earnings assessment, equity risk evaluation, following smart money trades
 
 ### 2. **Macro Analyst** (Economic Indicators)
-**Capabilities:** GDP, CPI, unemployment, FRED data, currency analysis, commodity prices, Fed nomination tracking, monetary policy hearings
+**Capabilities:** GDP, CPI, unemployment, FRED data, currency analysis, commodity prices, congressional bills tracking, federal rules monitoring, upcoming hearings
 **Use For:** Economic cycle analysis, rate environment, inflation impact, market timing, policy regime changes
 
 ### 3. **Fixed Income Analyst**
@@ -29,17 +29,18 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 **Use For:** Core portfolio construction, sector rotation, diversification, tactical allocation
 
 ### 5. **Derivatives Options Analyst**
-**Capabilities:** Options chains, implied volatility, Greeks analysis, futures curves, binary event identification from proposed rules
+**Capabilities:** Options chains, implied volatility, Greeks analysis, futures curves, policy event identification
 **Use For:** Hedging strategies, income generation, volatility trading, risk overlays, regulatory event plays
 
 ### 6. **Market Scanner**
-**Capabilities:** News analysis, market sentiment, overnight developments, material bill tracking, key hearing monitoring, federal rule watching
+**Capabilities:** News analysis, market sentiment, overnight developments, policy events (bills, hearings, federal rules)
 **Use For:** Daily market updates, breaking news, sentiment shifts, regulatory pipeline awareness
+**Policy Tools:** `get_recent_bills`, `get_federal_rules`, `get_upcoming_hearings` for bulk retrieval; detail tools for LLM-selected items
 
 ### 7. **Risk Analyst**
 **MCP Tools:** `mcp__risk-server__analyze_portfolio_risk`, `mcp__portfolio-state-server__get_portfolio_state`
-**Capabilities:** Multiple VaR methods, Ledoit-Wolf shrinkage, component risk, stress testing, regulatory compliance monitoring
-**Use For:** Portfolio risk assessment, stress testing, risk attribution, hedging design, final rule implementation tracking
+**Capabilities:** Multiple VaR methods, Ledoit-Wolf shrinkage, component risk, stress testing, policy impact assessment
+**Use For:** Portfolio risk assessment, stress testing, risk attribution, hedging design, regulatory risk monitoring
 
 ### 8. **Portfolio Manager**
 **MCP Tool:** `mcp__portfolio-optimization-server__optimize_portfolio_advanced` (handles all optimization methods)
@@ -48,8 +49,8 @@ You coordinate a team of specialist agents and MCP servers to deliver actionable
 
 ### 9. **Tax Advisor**
 **MCP Tools:** `mcp__tax-server__calculate_comprehensive_tax`, `mcp__tax-optimization-server__find_tax_loss_harvesting_pairs`, `mcp__portfolio-state-server__simulate_sale`
-**Capabilities:** Federal/state taxes, NIIT, trust tax, MA/CA specifics, loss harvesting, tax reform bill tracking
-**Use For:** Tax impact analysis, harvesting strategies, quarterly estimates, Ways & Means committee monitoring
+**Capabilities:** Federal/state taxes, NIIT, trust tax, MA/CA specifics, loss harvesting, tax legislation tracking
+**Use For:** Tax impact analysis, harvesting strategies, quarterly estimates, tax policy monitoring
 
 ## MANDATORY: Use Sequential Thinking
 
@@ -225,6 +226,26 @@ mcp__portfolio-state-server__get_portfolio_state()
 - `equity_compare_company_facts`: XBRL company facts
 
 **See `/openbb-mcp-customizations/OPENBB_TOOL_PARAMETERS.md` for complete guidance**
+
+## Policy Events MCP Server (Two-Stage Sieve Pattern)
+
+**IMPORTANT: No pre-filtering - LLM decides relevance**
+
+### Stage 1 - Bulk Retrieval (Unfiltered):
+- `get_recent_bills(days_back, max_results)`: ALL congressional bills
+- `get_federal_rules(days_back, days_ahead, max_results)`: ALL Federal Register documents  
+- `get_upcoming_hearings(days_ahead, max_results)`: ALL congressional hearings
+
+### Stage 2 - Detail Retrieval (After LLM Analysis):
+- `get_bill_details(bill_ids)`: Full details for LLM-selected bills
+- `get_rule_details(document_numbers)`: Full details for LLM-selected rules
+- `get_hearing_details(event_ids)`: Full details for LLM-selected hearings
+
+**Design Philosophy:**
+- Returns ALL data without filtering (no materiality thresholds)
+- LLM analyzes bulk results to identify relevant items
+- Details fetched only for LLM-selected items
+- Fails loudly with real errors (no mock data)
 
 ## SEC/EDGAR Tools for Authoritative Data
 
