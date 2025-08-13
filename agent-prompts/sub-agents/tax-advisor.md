@@ -184,25 +184,31 @@ rules = mcp__policy-events-service__get_federal_rules(days_back=30, days_ahead=3
 
 ### Stage 2: REQUIRED Tax Impact Analysis
 ```python
-# Identify tax-related legislation
+# Identify tax-related legislation from bulk metadata
 tax_bills = [b["bill_id"] for b in bills 
-             if any(committee in b.get("committees", []) 
-             for committee in ["ways_and_means", "finance"])
-             or "tax" in b.get("title", "").lower()]
+             if "tax" in b.get("title", "").lower()
+             or "revenue" in b.get("title", "").lower()]
 
+# Note: Hearing data often has empty fields - this is a known API limitation
 tax_hearings = [h["event_id"] for h in hearings 
-                if "Treasury" in h.get("key_officials", [])
-                or "tax" in h.get("topic", "").lower()]
+                if h.get("title") or h.get("committee")]  # Skip completely empty entries
 
 # MUST fetch details before tax analysis
 if tax_bills:
     bill_details = mcp__policy-events-service__get_bill_details(tax_bills)
+    # Details include URLs - use WebFetch on URLs for deeper analysis if needed
     # Analyze specific provisions: capital gains, SALT, estate tax
     
 if tax_hearings:
     hearing_details = mcp__policy-events-service__get_hearing_details(tax_hearings)
+    # Note: May still have incomplete data - focus on bills/rules for reliable info
     # Assess policy direction and timeline
 ```
+
+**IMPORTANT: Known Data Issues**
+- Hearing data frequently has empty titles/committees/dates (Congress.gov API limitation)
+- Focus on bills and federal rules which have more complete data
+- Detail tools provide URLs - use WebFetch on those for additional context
 
 **DO NOT report tax changes without reading actual legislative text**
 

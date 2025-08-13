@@ -36,29 +36,58 @@ If extracting from another tool's output, convert strings to native types first.
 
 ## Policy Event Monitoring - MANDATORY Two-Stage Process
 
-### Stage 1: Bulk Retrieval
+### ⚠️ CRITICAL: You MUST Complete BOTH Stages
+
+### Stage 1: Bulk Retrieval (Metadata Only)
 ```python
 bills = mcp__policy-events-service__get_recent_bills(days_back=30)
 hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14)
 rules = mcp__policy-events-service__get_federal_rules(days_back=30, days_ahead=30)
 ```
 
-### Stage 2: REQUIRED Detail Analysis
-**You MUST fetch details for items you identify as relevant:**
+### Stage 2: MANDATORY Detail Fetching
+**❌ INCOMPLETE WITHOUT THIS STEP**
+
+After Stage 1, identify potentially relevant items and ALWAYS fetch details:
 ```python
-# After analyzing bulk results, get details for relevant items
-if relevant_bills:  # e.g., bills mentioning "tax", "infrastructure", "Fed"
+# Example: Bills mentioning key economic terms
+relevant_bill_ids = []
+for bill in bills:
+    title = bill.get("title", "").lower()
+    if any(term in title for term in ["tax", "tariff", "inflation", "price", "fed", "treasury"]):
+        relevant_bill_ids.append(bill["bill_id"])
+
+# MANDATORY: Fetch full details
+if relevant_bill_ids:
     bill_details = mcp__policy-events-service__get_bill_details(relevant_bill_ids)
+    # NOW you can analyze actual bill text and impact
     
-if relevant_hearings:  # e.g., Fed Chair testimony, Treasury Secretary
-    hearing_details = mcp__policy-events-service__get_hearing_details(relevant_hearing_ids)
-    
-if relevant_rules:  # e.g., banking regulations, SEC rules
-    rule_details = mcp__policy-events-service__get_rule_details(relevant_document_numbers)
+# Similar for hearings and rules...
 ```
 
-**NEVER report policy conclusions without Stage 2 details**
-**Bulk results are metadata only - details contain actual content**
+**Examples of WRONG vs RIGHT:**
+- ❌ "HR-4962 suggests concern about tariffs" (no details fetched)
+- ✅ "HR-4962 details show ITC study on 10% tariff adding 0.5% to CPI" (after fetching)
+- ❌ "S-427 TAILOR Act presented to President" (just metadata)
+- ✅ "S-427 TAILOR Act analysis reveals banking regulation changes..." (after details)
+
+**IMPORTANT: Known Data Issues**
+- Congressional hearing data often has empty fields (missing titles, committees, dates)
+- This is a data source limitation, not an error
+- Focus on bills and federal rules which have complete data
+- Detail tools provide URLs - use WebFetch on those URLs for deeper analysis if needed
+
+**Using WebFetch with Detail URLs:**
+```python
+# After getting bill details with URL
+bill_details = mcp__policy-events-service__get_bill_details(["HR-4962"])
+# If you need more context, use the provided URL
+if bill_details and bill_details[0].get("url"):
+    WebFetch(url=bill_details[0]["url"], 
+            prompt="Extract specific economic impact projections and timeline")
+```
+
+**YOU MUST fetch details for ANY bill/hearing/rule you mention in your analysis**
 
 ## Critical Tool Parameters
 

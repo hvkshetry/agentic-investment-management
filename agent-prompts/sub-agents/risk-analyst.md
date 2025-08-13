@@ -146,23 +146,37 @@ hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14, max_
 ### Stage 2: REQUIRED Risk Analysis
 Identify risk-relevant items and MUST fetch details:
 ```python
-# Filter for financial regulations
+# Filter for financial regulations from bulk metadata
 risk_rules = [r["document_number"] for r in rules 
               if any(term in r.get("title", "").lower() 
               for term in ["basel", "dodd-frank", "margin", "capital", "liquidity"])]
 
 risk_bills = [b["bill_id"] for b in bills 
-              if "financial" in b.get("committees", [])]
+              if "financial" in b.get("title", "").lower()]
+
+# Note: Hearing data often has empty fields - this is a known API limitation
+risk_hearings = [h["event_id"] for h in hearings 
+                 if h.get("title") or h.get("committee")]  # Skip completely empty entries
 
 # MANDATORY: Fetch details before risk assessment
 if risk_rules:
     rule_details = mcp__policy-events-service__get_rule_details(risk_rules)
+    # Details include URLs - use WebFetch on URLs for deeper analysis if needed
     # Analyze effective_date, compliance requirements
     
 if risk_bills:
     bill_details = mcp__policy-events-service__get_bill_details(risk_bills)
     # Assess portfolio impact
+    
+if risk_hearings:
+    hearing_details = mcp__policy-events-service__get_hearing_details(risk_hearings)
+    # Note: May still have incomplete data - focus on bills/rules for reliable info
 ```
+
+**IMPORTANT: Known Data Issues**
+- Hearing data frequently has empty titles/committees/dates (Congress.gov API limitation)
+- Focus on bills and federal rules which have more complete data
+- Detail tools provide URLs - use WebFetch on those for additional context
 
 **NEVER assess regulatory risk from titles alone - fetch full details**
 

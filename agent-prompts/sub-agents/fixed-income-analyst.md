@@ -160,13 +160,13 @@ rules = mcp__policy-events-service__get_federal_rules(days_back=30, days_ahead=3
 
 ### Stage 2: REQUIRED Rate Impact Analysis
 ```python
-# Identify Fed-related events
+# Identify Fed-related events from bulk metadata
 fed_hearings = [h["event_id"] for h in hearings 
-                if any(official in h.get("key_officials", []) 
-                for official in ["Federal Reserve", "Fed Chair", "FOMC"])]
+                if h.get("title") or h.get("committee")]  # Skip completely empty entries
 
+# Note: Hearing data often has empty fields - this is a known API limitation
 treasury_hearings = [h["event_id"] for h in hearings 
-                    if "Treasury Secretary" in h.get("key_officials", [])]
+                    if "treasury" in (h.get("title", "") + h.get("committee", "")).lower()]
 
 debt_bills = [b["bill_id"] for b in bills 
               if "debt" in b.get("title", "").lower() 
@@ -175,7 +175,8 @@ debt_bills = [b["bill_id"] for b in bills
 # MUST fetch details before rate analysis
 if fed_hearings:
     hearing_details = mcp__policy-events-service__get_hearing_details(fed_hearings)
-    # Parse for hawkish/dovish signals, dot plot changes
+    # Note: May still have incomplete data - focus on bills/rules for reliable info
+    # Details include URLs - use WebFetch on URLs for deeper analysis if needed
     
 if treasury_hearings:
     treasury_details = mcp__policy-events-service__get_hearing_details(treasury_hearings)
@@ -185,6 +186,11 @@ if debt_bills:
     bill_details = mcp__policy-events-service__get_bill_details(debt_bills)
     # Analyze supply impact on rates
 ```
+
+**IMPORTANT: Known Data Issues**
+- Hearing data frequently has empty titles/committees/dates (Congress.gov API limitation)
+- Focus on bills and federal rules which have more complete data
+- Detail tools provide URLs - use WebFetch on those for additional context
 
 **DO NOT report "Fed testimony signals rate cut" without reading actual testimony**
 

@@ -15,7 +15,7 @@
         "broker": "vanguard"
       },
       {
-        "lot_id": "UBS_NE 55344_VOO_40",
+        "lot_id": "UBS_NE 55344_VOO_36",
         "symbol": "VOO",
         "quantity": 25.0,
         "purchase_date": "2023-08-14",
@@ -88,7 +88,7 @@
         "broker": "vanguard"
       },
       {
-        "lot_id": "UBS_NE 55344_QQQ_25",
+        "lot_id": "UBS_NE 55344_QQQ_21",
         "symbol": "QQQ",
         "quantity": 15.0,
         "purchase_date": "2023-08-14",
@@ -161,7 +161,7 @@
         "broker": "vanguard"
       },
       {
-        "lot_id": "UBS_NE 55344_VTI_41",
+        "lot_id": "UBS_NE 55344_VTI_37",
         "symbol": "VTI",
         "quantity": 290.0,
         "purchase_date": "2023-08-14",
@@ -341,7 +341,7 @@
     ],
     "AMD": [
       {
-        "lot_id": "UBS_NE 55344_AMD_4",
+        "lot_id": "UBS_NE 55344_AMD_0",
         "symbol": "AMD",
         "quantity": 143.0,
         "purchase_date": "2023-08-14",
@@ -356,7 +356,7 @@
     ],
     "GOOGL": [
       {
-        "lot_id": "UBS_NE 55344_GOOGL_5",
+        "lot_id": "UBS_NE 55344_GOOGL_1",
         "symbol": "GOOGL",
         "quantity": 215.0,
         "purchase_date": "2024-07-09",
@@ -371,7 +371,7 @@
     ],
     "AMGN": [
       {
-        "lot_id": "UBS_NE 55345_AMGN_6",
+        "lot_id": "UBS_NE 55345_AMGN_2",
         "symbol": "AMGN",
         "quantity": 75.0,
         "purchase_date": "2025-05-15",
@@ -386,7 +386,7 @@
     ],
     "AAPL": [
       {
-        "lot_id": "UBS_NE 55344_AAPL_7",
+        "lot_id": "UBS_NE 55344_AAPL_3",
         "symbol": "AAPL",
         "quantity": 63.0,
         "purchase_date": "2024-07-09",
@@ -401,7 +401,7 @@
     ],
     "AMAT": [
       {
-        "lot_id": "UBS_NE 55344_AMAT_8",
+        "lot_id": "UBS_NE 55344_AMAT_4",
         "symbol": "AMAT",
         "quantity": 64.0,
         "purchase_date": "2024-11-16",
@@ -416,7 +416,7 @@
     ],
     "WRB": [
       {
-        "lot_id": "UBS_NE 55344_WRB_9",
+        "lot_id": "UBS_NE 55344_WRB_5",
         "symbol": "WRB",
         "quantity": 225.0,
         "purchase_date": "2024-07-09",
@@ -431,7 +431,7 @@
     ],
     "BRKB": [
       {
-        "lot_id": "UBS_NE 55344_BRKB_10",
+        "lot_id": "UBS_NE 55344_BRKB_6",
         "symbol": "BRKB",
         "quantity": 366.0,
         "purchase_date": "2024-07-09",
@@ -446,7 +446,7 @@
     ],
     "BSX": [
       {
-        "lot_id": "UBS_NE 55344_BSX_11",
+        "lot_id": "UBS_NE 55344_BSX_7",
         "symbol": "BSX",
         "quantity": 200.0,
         "purchase_date": "2023-08-14",
@@ -461,7 +461,7 @@
     ],
     "AVGO": [
       {
-        "lot_id": "UBS_NE 55344_AVGO_12",
+        "lot_id": "UBS_NE 55344_AVGO_8",
         "symbol": "AVGO",
         "quantity": 200.0,
         "purchase_date": "2023-08-14",
@@ -476,7 +476,7 @@
     ],
     "CAH": [
       {
-        "lot_id": "UBS_NE 55344_CAH_13",
+        "lot_id": "UBS_NE 55344_CAH_9",
         "symbol": "CAH",
         "quantity": 105.0,
         "purchase_date": "2023-08-14",
@@ -491,7 +491,7 @@
     ],
     "CNC": [
       {
-        "lot_id": "UBS_NE 55344_CNC_14",
+        "lot_id": "UBS_NE 55344_CNC_10",
         "symbol": "CNC",
         "quantity": 112.0,
         "purchase_date": "2024-07-09",
@@ -506,7 +506,7 @@
     ],
     "CVX": [
       {
-        "lot_id": "UBS_NE 55344_CVX_15",
+        "lot_id": "UBS_NE 55344_CVX_11",
         "symbol": "CVX",
         "quantity": 75.0,
         "purchase_date": "2024-07-09",
@@ -521,7 +521,7 @@
     ],
     "CMG": [
       {
-        "lot_id": "UBS_NE 55344_CMG_16",
+        "lot_id": "UBS_NE 55344_CMG_12",
         "symbol": "CMG",
         "quantity": 250.0,
         "purchase_date": "2024-07-09",
@@ -536,7 +536,7 @@
     ],
     "FSLR": [
       {
-        "lot_id": "UBS_NE 55344_FSLR_17",
+        "lot_id": "UBS_NE 55344_FSLR_13",
         "symbol": "FSLR",
         "quantity": 32.0,
         "purchase_date": "2025-05-15",
@@ -551,7 +551,7 @@
     ],
     "FTNT": [
       {
-        "lot_id": "UBS_NE 55344_FTNT_18",
+        "lot_id": "UBS_NE 55344_FTNT_14",
         "symbol": "FTNT",
         "quantity": 71.0,
         "purchase_date": "2024-11-16",
@@ -566,7 +566,7 @@
     ],
     "GE": [
       {
-        "lot_id": "UBS_NE 55344_GE_19",
+        "lot_id": "UBS_NE 55344_GE_15",
         "symbol": "GE",
         "quantity": 95.0,
         "purchase_date": "2023-08-14",
@@ -581,7 +581,7 @@
     ],
     "GEV": [
       {
-        "lot_id": "UBS_NE 55344_GEV_20",
+        "lot_id": "UBS_NE 55344_GEV_16",
         "symbol": "GEV",
         "quantity": 23.0,
         "purchase_date": "2023-08-14",
@@ -594,7 +594,7 @@
         "broker": "ubs"
       },
       {
-        "lot_id": "UBS_NE 55345_GEV_21",
+        "lot_id": "UBS_NE 55345_GEV_17",
         "symbol": "GEV",
         "quantity": 108.0,
         "purchase_date": "2023-08-14",
@@ -609,7 +609,7 @@
     ],
     "HD": [
       {
-        "lot_id": "UBS_NE 55344_HD_22",
+        "lot_id": "UBS_NE 55344_HD_18",
         "symbol": "HD",
         "quantity": 25.0,
         "purchase_date": "2023-08-14",
@@ -622,7 +622,7 @@
         "broker": "ubs"
       },
       {
-        "lot_id": "UBS_NE 55345_HD_23",
+        "lot_id": "UBS_NE 55345_HD_19",
         "symbol": "HD",
         "quantity": 40.0,
         "purchase_date": "2025-05-15",
@@ -637,7 +637,7 @@
     ],
     "IR": [
       {
-        "lot_id": "UBS_NE 55344_IR_24",
+        "lot_id": "UBS_NE 55344_IR_20",
         "symbol": "IR",
         "quantity": 196.0,
         "purchase_date": "2023-08-14",
@@ -652,7 +652,7 @@
     ],
     "JAAA": [
       {
-        "lot_id": "UBS_NE 55345_JAAA_26",
+        "lot_id": "UBS_NE 55345_JAAA_22",
         "symbol": "JAAA",
         "quantity": 787.0,
         "purchase_date": "2025-05-15",
@@ -667,7 +667,7 @@
     ],
     "KKR": [
       {
-        "lot_id": "UBS_NE 55344_KKR_27",
+        "lot_id": "UBS_NE 55344_KKR_23",
         "symbol": "KKR",
         "quantity": 118.0,
         "purchase_date": "2023-08-14",
@@ -682,7 +682,7 @@
     ],
     "META": [
       {
-        "lot_id": "UBS_NE 55344_META_28",
+        "lot_id": "UBS_NE 55344_META_24",
         "symbol": "META",
         "quantity": 17.0,
         "purchase_date": "2023-08-14",
@@ -697,7 +697,7 @@
     ],
     "MSFT": [
       {
-        "lot_id": "UBS_NE 55344_MSFT_29",
+        "lot_id": "UBS_NE 55344_MSFT_25",
         "symbol": "MSFT",
         "quantity": 33.0,
         "purchase_date": "2023-08-14",
@@ -712,7 +712,7 @@
     ],
     "NFLX": [
       {
-        "lot_id": "UBS_NE 55344_NFLX_30",
+        "lot_id": "UBS_NE 55344_NFLX_26",
         "symbol": "NFLX",
         "quantity": 12.0,
         "purchase_date": "2024-07-09",
@@ -727,7 +727,7 @@
     ],
     "NVDA": [
       {
-        "lot_id": "UBS_NE 55344_NVDA_31",
+        "lot_id": "UBS_NE 55344_NVDA_27",
         "symbol": "NVDA",
         "quantity": 210.0,
         "purchase_date": "2023-08-14",
@@ -742,7 +742,7 @@
     ],
     "PANW": [
       {
-        "lot_id": "UBS_NE 55345_PANW_32",
+        "lot_id": "UBS_NE 55345_PANW_28",
         "symbol": "PANW",
         "quantity": 136.0,
         "purchase_date": "2025-05-15",
@@ -757,7 +757,7 @@
     ],
     "CRM": [
       {
-        "lot_id": "UBS_NE 55345_CRM_33",
+        "lot_id": "UBS_NE 55345_CRM_29",
         "symbol": "CRM",
         "quantity": 95.0,
         "purchase_date": "2025-05-15",
@@ -772,7 +772,7 @@
     ],
     "UNH": [
       {
-        "lot_id": "UBS_NE 55344_UNH_34",
+        "lot_id": "UBS_NE 55344_UNH_30",
         "symbol": "UNH",
         "quantity": 16.0,
         "purchase_date": "2024-07-09",
@@ -787,7 +787,7 @@
     ],
     "VTMGX": [
       {
-        "lot_id": "UBS_NE 55344_VTMGX_35",
+        "lot_id": "UBS_NE 55344_VTMGX_31",
         "symbol": "VTMGX",
         "quantity": 774.523,
         "purchase_date": "2024-11-16",
@@ -802,7 +802,7 @@
     ],
     "VDADX": [
       {
-        "lot_id": "UBS_NE 55344_VDADX_36",
+        "lot_id": "UBS_NE 55344_VDADX_32",
         "symbol": "VDADX",
         "quantity": 769.072,
         "purchase_date": "2023-08-14",
@@ -817,7 +817,7 @@
     ],
     "VDE": [
       {
-        "lot_id": "UBS_NE 55344_VDE_37",
+        "lot_id": "UBS_NE 55344_VDE_33",
         "symbol": "VDE",
         "quantity": 300.0,
         "purchase_date": "2025-05-15",
@@ -832,7 +832,7 @@
     ],
     "MGK": [
       {
-        "lot_id": "UBS_NE 55344_MGK_38",
+        "lot_id": "UBS_NE 55344_MGK_34",
         "symbol": "MGK",
         "quantity": 40.0,
         "purchase_date": "2023-08-14",
@@ -847,7 +847,7 @@
     ],
     "VGSLX": [
       {
-        "lot_id": "UBS_NE 55344_VGSLX_39",
+        "lot_id": "UBS_NE 55344_VGSLX_35",
         "symbol": "VGSLX",
         "quantity": 79.747,
         "purchase_date": "2024-11-16",
@@ -862,7 +862,7 @@
     ],
     "VRTX": [
       {
-        "lot_id": "UBS_NE 55344_VRTX_42",
+        "lot_id": "UBS_NE 55344_VRTX_38",
         "symbol": "VRTX",
         "quantity": 23.0,
         "purchase_date": "2024-07-09",
@@ -877,7 +877,7 @@
     ],
     "V": [
       {
-        "lot_id": "UBS_NE 55344_V_43",
+        "lot_id": "UBS_NE 55344_V_39",
         "symbol": "V",
         "quantity": 39.0,
         "purchase_date": "2024-11-16",
@@ -894,14 +894,14 @@
   "accounts": {
     "30433360": {
       "broker": "vanguard",
-      "last_import": "2025-08-13T03:57:43.280228+00:00",
+      "last_import": "2025-08-13T11:30:24.868879+00:00",
       "num_lots_imported": 20
     },
-    "NE_55344_55345": {
+    "NE_55344": {
       "broker": "ubs",
-      "last_import": "2025-08-13T03:59:29.276369+00:00",
+      "last_import": "2025-08-13T11:32:43.400491+00:00",
       "num_lots_imported": 40
     }
   },
-  "last_updated": "2025-08-13T03:59:29.276799+00:00"
+  "last_updated": "2025-08-13T11:32:43.401035+00:00"
 }

@@ -160,21 +160,29 @@ rules = mcp__policy-events-service__get_federal_rules(days_back=7, days_ahead=7,
 After identifying market-moving events from bulk results, you MUST fetch details:
 ```python
 # Identify market catalysts from bulk metadata
-market_bills = [b["bill_id"] for b in bills if "tax" in b["title"].lower() 
-                or "fed" in b["title"].lower() or b["materiality_score"] > 7]
+market_bills = [b["bill_id"] for b in bills if any(term in b.get("title", "").lower() 
+                for term in ["tax", "fed", "tariff", "spending", "debt"])]
                 
-fed_hearings = [h["event_id"] for h in hearings 
-                if "Federal Reserve" in h.get("key_officials", [])]
+# Note: Hearing data often has empty fields - this is a known API limitation
+relevant_hearings = [h["event_id"] for h in hearings 
+                    if h.get("title") or h.get("committee")]  # Skip completely empty entries
                 
 # MUST fetch details before reporting
 if market_bills:
     bill_details = mcp__policy-events-service__get_bill_details(market_bills)
-if fed_hearings:
-    hearing_details = mcp__policy-events-service__get_hearing_details(fed_hearings)
+    # Details include URLs - use WebFetch on URLs for deeper analysis if needed
+    
+if relevant_hearings:
+    hearing_details = mcp__policy-events-service__get_hearing_details(relevant_hearings)
+    # Note: May still have incomplete data - focus on bills/rules for reliable info
 ```
 
-**DO NOT report "Fed testimony next week" without fetching hearing details**
-**DO NOT report "tax bill advancing" without fetching bill text**
+**IMPORTANT: Known Data Issues**
+- Hearing data frequently has empty titles/committees/dates (Congress.gov API limitation)
+- Focus on bills and federal rules which have more complete data
+- Detail tools provide URLs - use WebFetch on those for additional context
+
+**DO NOT report conclusions without fetching details first**
 
 ## Warning Signals
 

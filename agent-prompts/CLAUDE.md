@@ -263,12 +263,17 @@ mcp__risk-server__analyze_portfolio_risk(
 ### Stage 1 - Bulk Retrieval (Unfiltered):
 - `get_recent_bills(days_back, max_results)`: ALL congressional bills (119th Congress auto-detected)
 - `get_federal_rules(days_back, days_ahead, max_results)`: ALL Federal Register documents  
-- `get_upcoming_hearings(days_ahead, max_results)`: ALL congressional hearings with enhanced metadata
+- `get_upcoming_hearings(days_ahead, max_results)`: Congressional hearings (NOTE: often has empty fields due to data source limitations)
 
 ### Stage 2 - Detail Retrieval (After LLM Analysis):
-- `get_bill_details(bill_ids)`: Full details for LLM-selected bills
+- `get_bill_details(bill_ids)`: Full details with URLs for LLM-selected bills
 - `get_rule_details(document_numbers)`: Full details with Federal Register API content
-- `get_hearing_details(event_ids)`: Full details for LLM-selected hearings
+- `get_hearing_details(event_ids)`: Details for LLM-selected hearings (may be incomplete)
+
+**Known Issues:**
+- Hearing data frequently has empty fields (titles, committees, dates) - this is a source limitation
+- Detail tools provide URLs - agents can use WebFetch on these URLs for deeper analysis
+- Bills and Federal rules generally have complete data
 
 **Design Philosophy:**
 - Returns ALL data without filtering (no materiality thresholds)

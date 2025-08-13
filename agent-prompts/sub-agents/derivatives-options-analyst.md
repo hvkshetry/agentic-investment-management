@@ -148,22 +148,56 @@ All responses to other agents must include structured JSON:
 2. **Volume Spikes**: Single strike with 10x average volume = institutional trade
 3. **IV Changes**: >20% IV spike at specific strike = large order detected
 
-## Binary Event Detection
+## Binary Event Detection - Two-Stage Process
 
-**Proposed Rules:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- rule_type="proposed" for comment period plays
-- Check binary_event_date for known catalysts
-- options_opportunity=true means vol mispricing likely
+### Stage 1: Scan for Vol-Impacting Events
+```python
+bills = mcp__policy-events-service__get_recent_bills(days_back=30, max_results=200)
+hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14, max_results=50)
+rules = mcp__policy-events-service__get_federal_rules(days_back=7, days_ahead=30, max_results=200)
+```
 
-**Fed Hearings:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- Returns binary_event_date for FOMC testimony
-- Vol expansion 2-3 days before, collapse after
-- Check key_officials for "Federal Reserve" presence
+### Stage 2: REQUIRED Detail Analysis for Options Plays
+```python
+# Identify binary events from bulk metadata
+binary_bills = [b["bill_id"] for b in bills 
+                if any(term in b.get("title", "").lower() 
+                for term in ["merger", "acquisition", "drug", "fda", "patent"])]
 
-**RIN Pipeline:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- options_windows array shows vol expansion dates
-- Proposed→Final creates 3-6 month calendar spreads
-- priority="Economically Significant" = material impact
+# Note: Hearing data often has empty fields - this is a known API limitation
+fed_hearings = [h["event_id"] for h in hearings 
+                if h.get("title") or h.get("committee")]  # Skip completely empty entries
+
+# Proposed rules create vol expansion opportunities
+proposed_rules = [r["document_number"] for r in rules 
+                  if r.get("rule_stage") == "Proposed Rule"]
+
+# MUST fetch details before options analysis
+if binary_bills:
+    bill_details = mcp__policy-events-service__get_bill_details(binary_bills)
+    # Details include URLs - use WebFetch on URLs for deeper analysis if needed
+    # Vol expansion 2-3 days before vote, collapse after
+    
+if fed_hearings:
+    hearing_details = mcp__policy-events-service__get_hearing_details(fed_hearings)
+    # Note: May still have incomplete data - focus on bills/rules for reliable info
+    # FOMC testimony = guaranteed vol spike
+    
+if proposed_rules:
+    rule_details = mcp__policy-events-service__get_rule_details(proposed_rules)
+    # Comment close date = vol catalyst
+    # Proposed→Final creates 3-6 month calendar spreads
+```
+
+**IMPORTANT: Known Data Issues**
+- Hearing data frequently has empty titles/committees/dates (Congress.gov API limitation)
+- Focus on bills and federal rules which have more complete data
+- Detail tools provide URLs - use WebFetch on those for additional context
+
+**Options Trading Windows:**
+- Bills: Vol ramps 3-5 days before floor vote
+- Rules: Vol spikes at comment close and final publication
+- Hearings: If data available, vol expansion 2 days before
 4. **Bid-Ask Analysis**: Trades at ask = bullish sweep, at bid = bearish
 5. **Time & Sales Pattern**: Multiple same-strike trades in <5min = block/sweep
 

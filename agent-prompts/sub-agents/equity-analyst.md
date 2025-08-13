@@ -40,26 +40,31 @@ rules = mcp__policy-events-service__get_federal_rules(days_back=7, days_ahead=7)
 
 ### Stage 2: REQUIRED Detail Analysis for Equity Impact
 ```python
-# Identify sector-specific legislation
+# Identify sector-specific legislation from bulk metadata
 sector_bills = [b["bill_id"] for b in bills 
-                if b.get("materiality_score", 0) > 6 
-                and any(sector in b.get("affected_sectors", []) 
-                for sector in ["technology", "healthcare", "energy"])]
+                if any(term in b.get("title", "").lower() 
+                for term in ["tax", "antitrust", "energy", "healthcare", "tech"])]
 
-# CEO testimony events
+# Note: Hearing data often has empty fields - this is a known API limitation
 ceo_hearings = [h["event_id"] for h in hearings 
-                if "CEO" in h.get("witness_list", "") 
-                or "antitrust" in h.get("topic", "").lower()]
+                if h.get("title") or h.get("committee")]  # Skip completely empty entries
 
 # MUST fetch details before equity analysis
 if sector_bills:
     bill_details = mcp__policy-events-service__get_bill_details(sector_bills)
+    # Details include URLs - use WebFetch on URLs for deeper analysis if needed
     # Analyze impact on holdings in affected sectors
     
 if ceo_hearings:
     hearing_details = mcp__policy-events-service__get_hearing_details(ceo_hearings)
+    # Note: May still have incomplete data - focus on bills/rules for reliable info
     # Assess regulatory risk for specific companies
 ```
+
+**IMPORTANT: Known Data Issues**
+- Hearing data frequently has empty titles/committees/dates (Congress.gov API limitation)
+- Focus on bills and federal rules which have more complete data
+- Detail tools provide URLs - use WebFetch on those for additional context
 
 **DO NOT report sector impacts without reading actual bill/hearing content**
 
