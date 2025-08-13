@@ -212,6 +212,21 @@ mcp__portfolio-state-server__import_broker_csv(
 mcp__portfolio-state-server__get_portfolio_state()
 ```
 
+### Portfolio Weights
+Portfolio state includes pre-calculated weights in `tickers_and_weights`:
+
+```python
+state = mcp__portfolio-state-server__get_portfolio_state()
+tw = state["tickers_and_weights"]  # {"tickers": [...], "weights": [...], "count": N}
+
+# Direct pass-through to tools
+mcp__risk-server__analyze_portfolio_risk(
+    tickers=tw["tickers"],
+    weights=tw["weights"],
+    analysis_options={...}
+)
+```
+
 ### Why This Design?
 - **Predictable**: Always know you're starting clean
 - **Simple**: No complex duplicate detection needed
@@ -231,7 +246,7 @@ mcp__portfolio-state-server__get_portfolio_state()
   - `short_interest`: FINRA (free, no API key)
   - `short_volume`: Stockgrid (free, no API key)
 - **Fixed income**: Use `provider="federal_reserve"` (free)
-- **News**: Use `limit=20` with `provider="yfinance"`
+- **News**: Use `provider="yfinance"` (no date/limit needed - auto-optimized to 50 articles)
 
 ### MD&A and SEC Tools:
 - `equity_fundamental_management_discussion_analysis`: SEC MD&A extraction

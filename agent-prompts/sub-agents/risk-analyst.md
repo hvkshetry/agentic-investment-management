@@ -47,18 +47,22 @@ If extracting from another tool's output, convert strings to native types first.
 ### MANDATORY: Full Portfolio Analysis
 When calling analyze_portfolio_risk:
 - tickers: ALL positions from portfolio_state (all 55+, not subset)
-- weights: **REQUIRED PARAMETER** - ACTUAL weights from portfolio_state (will be normalized)
+- weights: **REQUIRED PARAMETER** - Extract from portfolio_state["tickers_and_weights"]["weights"]
 - analysis_options: MUST include {"use_portfolio_state": true, "portfolio_value": <actual_value>}
 
 **CRITICAL: weights parameter is REQUIRED - you cannot omit it**
 **If tool returns validation errors: STOP and report failure - don't use fake data**
 
-### Extracting Weights from Portfolio State (REQUIRED)
-When you get positions from portfolio_state:
-1. Calculate: weight = position_value / total_value  
-2. Build native list: weights = [0.04245, 0.01547, ...]
-3. Pass directly to tool - do NOT convert to string or JSON
-4. Weights will be normalized by the tool if they don't sum to 1.0
+### Weight Extraction
+```python
+state = mcp__portfolio-state-server__get_portfolio_state()
+tw = state["tickers_and_weights"]
+mcp__risk-server__analyze_portfolio_risk(
+    tickers=tw["tickers"],
+    weights=tw["weights"],
+    analysis_options={...}
+)
+```
 
 ### 2. mcp__portfolio-state-server__get_portfolio_state
 Get current portfolio holdings:
@@ -130,25 +134,37 @@ Standard scenarios applied:
 }
 ```
 
-## Regulatory Risk Monitoring (Two-Stage Sieve)
+## Regulatory Risk Monitoring - MANDATORY Two-Stage Process
 
-**Stage 1 - Get ALL Policy Events:**
+### Stage 1: Bulk Collection
 ```python
-# No filtering - get everything
-rules = get_federal_rules(days_back=30, days_ahead=30, max_results=200)
-bills = get_recent_bills(days_back=30, max_results=200)
+rules = mcp__policy-events-service__get_federal_rules(days_back=30, days_ahead=30, max_results=200)
+bills = mcp__policy-events-service__get_recent_bills(days_back=30, max_results=200)
+hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14, max_results=50)
 ```
 
-**Stage 2 - YOU Identify Risk-Relevant Items:**
-- Analyze for: Basel III, Dodd-Frank, margin requirements
-- Look for effective dates affecting portfolio
-- Then get details:
+### Stage 2: REQUIRED Risk Analysis
+Identify risk-relevant items and MUST fetch details:
 ```python
-get_rule_details(["2025-15325"])  # For identified rules
-get_bill_details(["HR-1234"])     # For identified bills
+# Filter for financial regulations
+risk_rules = [r["document_number"] for r in rules 
+              if any(term in r.get("title", "").lower() 
+              for term in ["basel", "dodd-frank", "margin", "capital", "liquidity"])]
+
+risk_bills = [b["bill_id"] for b in bills 
+              if "financial" in b.get("committees", [])]
+
+# MANDATORY: Fetch details before risk assessment
+if risk_rules:
+    rule_details = mcp__policy-events-service__get_rule_details(risk_rules)
+    # Analyze effective_date, compliance requirements
+    
+if risk_bills:
+    bill_details = mcp__policy-events-service__get_bill_details(risk_bills)
+    # Assess portfolio impact
 ```
 
-**Remember: Tools return EVERYTHING - YOU decide risk relevance**
+**NEVER assess regulatory risk from titles alone - fetch full details**
 
 ## Report Generation
 

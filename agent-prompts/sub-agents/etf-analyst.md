@@ -98,22 +98,33 @@ All responses to other agents must include structured JSON:
 
 ## CRITICAL Tool-Specific Parameters
 
+**Quick Examples:**
+```python
+etf_equity_exposure(symbol="AAPL", provider="fmp")  # Which ETFs hold AAPL (top 20)
+
+# ETF Holdings - Use sector ETFs for manageable data
+etf_holdings(symbol="XLE", provider="sec")  # Energy sector - ~30 holdings ✅
+etf_holdings(symbol="XLF", provider="sec")  # Financials - ~70 holdings ✅ 
+# AVOID: SPY (500+), IWM (2000+), VOO (500+) - too large even with limiting
+
+etf_sectors(symbol="XLK", provider="yfinance")  # Sector breakdown
+```
+
+**Provider Selection Guide:**
+
 **Working Tools (No API Key Required):**
 - `etf_historical`: Use provider: **yfinance** (full OHLCV data)
 - `etf_info`: Use provider: **yfinance** (NAV, assets, yield)
-- `etf_holdings`: Use provider: **sec** (detailed holdings)
+- `etf_holdings`: Use provider: **sec** for sector ETFs (XLE, XLF, XLK, etc.)
+  - Returns top 50 holdings (auto-limited)
+  - AVOID broad ETFs: SPY, IWM, VOO (too many holdings)
 
 **Tools Requiring FMP API:**
+- `etf_equity_exposure`: Use provider: **fmp** (finds ETFs holding a stock)
 - `etf_search`: Use provider: **fmp**
 - `etf_price_performance`: Use provider: **fmp**
-- `etf_sectors`: Use provider: **fmp**
+- `etf_sectors`: Use provider: **fmp** or **yfinance**
 - `etf_countries`: Use provider: **fmp**
-
-**Best Practices:**
-- For large ETFs (SPY, IWM), warn about extensive holdings output
-- Prefer QQQ over SPY for holdings analysis (fewer positions)
-- Always verify expense ratios with multiple sources
-- Check both trading volume and AUM for liquidity
 
 ## Report Generation
 

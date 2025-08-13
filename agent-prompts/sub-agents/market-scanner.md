@@ -42,20 +42,30 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 
 ## MCP Tool Examples (CRITICAL)
 
-**CORRECT - Integers without quotes:**
+**CORRECT - Native types:**
 ```python
-mcp__openbb-curated__news_company(symbol="AAPL", limit=20)
+mcp__openbb-curated__news_company(symbol="AAPL", provider="yfinance")  # No limit needed
 mcp__openbb-curated__equity_fundamental_filings(symbol="SPY", provider="sec", limit=10)
 mcp__openbb-curated__regulators_sec_rss_litigation()
 ```
 
 **WRONG - Never use quotes for numbers:**
 ```python
-mcp__openbb-curated__news_company(limit="20")  # ❌ FAILS
+mcp__openbb-curated__equity_fundamental_filings(limit="10")  # ❌ FAILS
 ```
 
 **Available tools for market monitoring:**
-- `news_company`: Company-specific news (use limit=20, provider="yfinance")
+
+**news_company** (Company-specific news):
+```python
+news_company(
+    symbol="AAPL",
+    provider="yfinance"
+    # No date or limit parameters needed - automatically optimized
+)
+# Returns up to 50 recent articles (auto-limited to prevent token overflow)
+```
+
 - `regulators_sec_rss_litigation`: SEC enforcement and litigation news
 - `equity_fundamental_filings`: Recent SEC filings for specific tickers
 - WebSearch: Fallback for broader market news
@@ -137,29 +147,34 @@ Track non-traditional indicators:
 - Defensive sectors leading
 - Crypto selling off
 
-## Policy Event Monitoring (Two-Stage Sieve)
+## Policy Event Monitoring - MANDATORY Two-Stage Process
 
-### Stage 1 - Scan ALL Policy Events (No Filtering):
+### Stage 1: Bulk Scan
 ```python
-# Get ALL recent bills
 bills = mcp__policy-events-service__get_recent_bills(days_back=7, max_results=100)
-# Get ALL upcoming hearings  
 hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=7, max_results=50)
-# Get ALL federal rules
 rules = mcp__policy-events-service__get_federal_rules(days_back=7, days_ahead=7, max_results=100)
 ```
 
-### Stage 2 - YOU Identify Market-Moving Events:
-- Analyze bulk results for market impact
-- Look for: Fed hearings, tax bills, regulatory changes
-- Get details ONLY for relevant items:
+### Stage 2: REQUIRED Detail Fetching
+After identifying market-moving events from bulk results, you MUST fetch details:
 ```python
-# After YOUR analysis identifies important items
-details = mcp__policy-events-service__get_bill_details(["HR-1234", "S-567"])
-hearing_info = mcp__policy-events-service__get_hearing_details(["116264"])
+# Identify market catalysts from bulk metadata
+market_bills = [b["bill_id"] for b in bills if "tax" in b["title"].lower() 
+                or "fed" in b["title"].lower() or b["materiality_score"] > 7]
+                
+fed_hearings = [h["event_id"] for h in hearings 
+                if "Federal Reserve" in h.get("key_officials", [])]
+                
+# MUST fetch details before reporting
+if market_bills:
+    bill_details = mcp__policy-events-service__get_bill_details(market_bills)
+if fed_hearings:
+    hearing_details = mcp__policy-events-service__get_hearing_details(fed_hearings)
 ```
 
-**Remember: The tools return EVERYTHING - YOU decide what matters for markets**
+**DO NOT report "Fed testimony next week" without fetching hearing details**
+**DO NOT report "tax bill advancing" without fetching bill text**
 
 ## Warning Signals
 
@@ -329,10 +344,15 @@ hearing_info = mcp__policy-events-service__get_hearing_details(["116264"])
 
 ## CRITICAL Tool-Specific Parameters
 
-**News Tools (ALWAYS USE):**
-- `news_world`: limit=20, provider="yfinance"
-- `news_company`: limit=20, provider="yfinance"
-- Never use without limit parameter (will overflow tokens)
+**News Tools:**
+```python
+# Company news (auto-limited to 50 articles)
+news_company(
+    symbol="AAPL",
+    provider="yfinance"
+    # No date or limit needed - handled automatically
+)
+```
 
 **Alternative Approaches:**
 - Use WebSearch for current market sentiment if news APIs unavailable

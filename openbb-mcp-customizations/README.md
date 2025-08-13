@@ -28,7 +28,7 @@ This is a modified version of the OpenBB MCP server that loads only a curated se
 To avoid token limit errors and ensure proper functionality:
 - `economy_direction_of_trade` - Use country="us", frequency="annual", limit=100
 - `economy_balance_of_payments` - Always include start_date
-- `news_world`/`news_company` - Use limit=20 with yfinance provider
+- `news_company` - Use provider="yfinance" (no date/limit needed - auto-optimized to 50 articles)
 - `etf_equity_exposure` - Use sector ETFs (XLK, XLF) not SPY
 - `equity_discovery_gainers` - Use limit=50
 - `economy_fred_series` - NEVER use limit parameter, use date ranges

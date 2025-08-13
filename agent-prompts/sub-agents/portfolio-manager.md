@@ -50,15 +50,18 @@ If extracting from another tool's output, convert strings to native types first.
 
 ## MCP Server Tool: mcp__portfolio-optimization-server__optimize_portfolio_advanced
 
-**Correct usage example:**
 ```python
+state = mcp__portfolio-state-server__get_portfolio_state()
+tw = state["tickers_and_weights"]
+
 mcp__portfolio-optimization-server__optimize_portfolio_advanced(
-    tickers=["SPY", "AGG", "GLD", "VNQ"],      # List, NOT string
-    optimization_config={                        # Dict, NOT string
+    tickers=tw["tickers"],
+    optimization_config={
         "lookback_days": 756,
-        "portfolio_value": 1000000,
+        "portfolio_value": state["summary"]["total_value"],
         "risk_measure": "MV",
         "optimization_methods": ["HRP", "Mean-Risk"],
+        "current_weights": tw["weights"],
         "constraints": {
             "min_weight": 0.0,
             "max_weight": 1.0

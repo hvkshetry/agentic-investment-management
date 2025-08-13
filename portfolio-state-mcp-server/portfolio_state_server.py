@@ -653,6 +653,27 @@ async def get_portfolio_state(
             for lot in lots:
                 all_lots.append(lot.to_dict())
         
+        # Create tickers_and_weights for direct pass-through to risk/optimization tools
+        # Sort tickers alphabetically for consistent ordering
+        sorted_tickers = sorted(portfolio_manager.positions.keys())
+        tickers = []
+        weights = []
+        
+        for symbol in sorted_tickers:
+            pos = portfolio_manager.positions[symbol]
+            # Skip non-investable positions
+            if symbol not in ['CASH', 'VMFXX', 'N/A']:
+                tickers.append(symbol)
+                # Calculate normalized weight
+                weight = pos.current_value / total_value if total_value > 0 else 0
+                weights.append(weight)
+        
+        # Ensure weights sum to 1.0 (handle rounding)
+        if weights:
+            weight_sum = sum(weights)
+            if weight_sum > 0:
+                weights = [w / weight_sum for w in weights]
+        
         return {
             "summary": {
                 "total_value": total_value,
@@ -666,6 +687,11 @@ async def get_portfolio_state(
             "positions": positions_summary,
             "tax_lots": all_lots,
             "accounts": portfolio_manager.accounts,
+            "tickers_and_weights": {
+                "tickers": tickers,
+                "weights": weights,
+                "count": len(tickers)
+            },
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "confidence": 1.0
         }

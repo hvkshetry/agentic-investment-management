@@ -29,22 +29,39 @@ If extracting from another tool's output, convert strings to native types first.
 - Analyst consensus tracking
 - Insider trading and ownership analysis
 
-## Policy Signal Tracking
+## Policy Signal Tracking - Two-Stage Process
 
-**Congressional Trades:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- Check min_amount=50000 for high-conviction trades
-- unusual_activity=true flags sector clustering
-- Match ticker to portfolio holdings for follow signals
+### Stage 1: Scan for Equity-Relevant Events
+```python
+bills = mcp__policy-events-service__get_recent_bills(days_back=30)
+hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14)
+rules = mcp__policy-events-service__get_federal_rules(days_back=7, days_ahead=7)
+```
 
-**CEO Hearings:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- Filter for CEO testimony in affected_sectors
-- Binary event if antitrust or regulatory focus
+### Stage 2: REQUIRED Detail Analysis for Equity Impact
+```python
+# Identify sector-specific legislation
+sector_bills = [b["bill_id"] for b in bills 
+                if b.get("materiality_score", 0) > 6 
+                and any(sector in b.get("affected_sectors", []) 
+                for sector in ["technology", "healthcare", "energy"])]
 
-**Sector Bills:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- Check affected_sectors matches holdings
-- min_materiality=6 for actionable signals
-- status="PASSED_HOUSE" or "PASSED_SENATE" = imminent
-- Technical indicator integration
+# CEO testimony events
+ceo_hearings = [h["event_id"] for h in hearings 
+                if "CEO" in h.get("witness_list", "") 
+                or "antitrust" in h.get("topic", "").lower()]
+
+# MUST fetch details before equity analysis
+if sector_bills:
+    bill_details = mcp__policy-events-service__get_bill_details(sector_bills)
+    # Analyze impact on holdings in affected sectors
+    
+if ceo_hearings:
+    hearing_details = mcp__policy-events-service__get_hearing_details(ceo_hearings)
+    # Assess regulatory risk for specific companies
+```
+
+**DO NOT report sector impacts without reading actual bill/hearing content**
 
 ## Required Tool Parameters
 
@@ -63,6 +80,12 @@ When calling OpenBB tools, ensure numeric parameters are NOT strings:
 - `equity_shorts_short_interest`: FINRA (free, no API key)
 - `equity_shorts_short_volume`: Stockgrid (free, no API key)
 - `equity_compare_company_facts`: XBRL facts from SEC
+  ```python
+  equity_compare_company_facts(
+      fact="Assets",        # EXACT GAAP name: Assets, Revenues, NetIncomeLoss
+      fiscal_period="FY"    # FY (annual) or Q1/Q2/Q3/Q4
+  )
+  ```
 
 ## MCP Tool Examples (CRITICAL)
 

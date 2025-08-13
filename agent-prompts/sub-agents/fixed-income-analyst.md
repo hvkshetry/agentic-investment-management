@@ -149,17 +149,44 @@ Position for rate environment:
 - BOJ: YCC policy impacts
 - PBOC: CNY implications
 
-## Policy Event Monitoring
+## Policy Event Monitoring - Two-Stage Process
 
-**Fed Nominations:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- positions=["Federal Reserve", "Treasury Secretary"]
-- Confirmation changes rate path expectations
-- Check confirmation_probability for timing
+### Stage 1: Scan for Fixed Income Events
+```python
+bills = mcp__policy-events-service__get_recent_bills(days_back=30)
+hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14)
+rules = mcp__policy-events-service__get_federal_rules(days_back=30, days_ahead=30)
+```
 
-**FOMC Hearings:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- Filter for "Federal Reserve" in key_officials
-- binary_event_date = known vol expansion
-- Hawkish/dovish signals move entire curve
+### Stage 2: REQUIRED Rate Impact Analysis
+```python
+# Identify Fed-related events
+fed_hearings = [h["event_id"] for h in hearings 
+                if any(official in h.get("key_officials", []) 
+                for official in ["Federal Reserve", "Fed Chair", "FOMC"])]
+
+treasury_hearings = [h["event_id"] for h in hearings 
+                    if "Treasury Secretary" in h.get("key_officials", [])]
+
+debt_bills = [b["bill_id"] for b in bills 
+              if "debt" in b.get("title", "").lower() 
+              or "budget" in b.get("title", "").lower()]
+
+# MUST fetch details before rate analysis
+if fed_hearings:
+    hearing_details = mcp__policy-events-service__get_hearing_details(fed_hearings)
+    # Parse for hawkish/dovish signals, dot plot changes
+    
+if treasury_hearings:
+    treasury_details = mcp__policy-events-service__get_hearing_details(treasury_hearings)
+    # Assess funding needs, issuance changes
+    
+if debt_bills:
+    bill_details = mcp__policy-events-service__get_bill_details(debt_bills)
+    # Analyze supply impact on rates
+```
+
+**DO NOT report "Fed testimony signals rate cut" without reading actual testimony**
 
 ## Output Format
 
@@ -278,9 +305,14 @@ Position for rate environment:
 ## CRITICAL Tool-Specific Parameters
 
 **Treasury Data:**
-- `fixedincome_government_treasury_rates`: provider="federal_reserve"
-- `fixedincome_government_yield_curve`: Gets full curve
-- Both return current day data only
+```python
+fixedincome_government_treasury_rates(
+    provider="federal_reserve",
+    start_date="2025-01-01",  # REQUIRED: Max 30 days back
+    end_date="2025-01-13"      # REQUIRED: Today's date
+)
+```
+**MUST provide start_date and end_date to prevent token overflow**
 
 **Spread Analysis:**
 - Use `fixedincome_spreads_tcm` for credit spread proxies

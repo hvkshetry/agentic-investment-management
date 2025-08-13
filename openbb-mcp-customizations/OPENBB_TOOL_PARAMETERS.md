@@ -145,15 +145,30 @@ The following tools have been removed as they are deprecated or redundant:
 - **port_code**: Specific ports (e.g., "rotterdam,singapore")
 - Returns TEU (Twenty-foot Equivalent Unit) volumes and average dwelling times
 
+## News Tools
+
+### news_company
+```python
+# Simplified usage - no date or limit parameters needed
+obb.news.company(
+    symbol="AAPL",
+    provider="yfinance"
+)
+# Automatically limited to 50 most recent articles
+# Date filtering handled internally (last 7 days for yfinance)
+# No need to specify limit parameter
+```
+
 ## Tips for Optimal Usage
 
-1. Always specify date ranges for the four tools that require them
+1. Always specify date ranges for the four tools that require them (except news_company)
 2. Use 1-year ranges for most analyses to balance data volume with context
 3. For BLS tools, use proper BLS series IDs, not FRED equivalents
 4. When a tool fails with a provider, try alternative providers listed above
 5. For risk premium calculations, use economy_fred_series to get component rates and calculate spreads manually
 6. For trade analysis, use bilateral flows to track specific trade relationships
-7. Monitor port volumes as leading indicators of trade disruptions## Complete List of 43 Curated Tools
+7. Monitor port volumes as leading indicators of trade disruptions
+8. For news_company, just provide symbol and provider - date/limit handled automatically## Complete List of 43 Curated Tools
 
 ### Economy (5 tools)
 - economy_cpi

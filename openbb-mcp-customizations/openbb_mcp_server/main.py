@@ -5,6 +5,10 @@ import re
 import sys
 from typing import Annotated
 
+# Apply response limiting patches before anything else
+from . import apply_response_limiting_patches
+apply_response_limiting_patches()
+
 from fastapi import FastAPI
 from fastmcp import FastMCP
 from fastmcp.server.openapi import (

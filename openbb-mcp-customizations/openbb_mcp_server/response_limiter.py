@@ -20,11 +20,12 @@ class ResponseLimiter:
     def __init__(self):
         self.problem_endpoints = {
             'etf_equity_exposure': self.limit_etf_equity_exposure,
+            'etf_holdings': self.limit_etf_holdings,
             'equity_compare_company_facts': self.limit_company_facts,
             'fixedincome_government_treasury_rates': self.apply_date_filter,
             'fixedincome_spreads_tcm': self.apply_date_filter,
             'fixedincome_spreads_treasury_effr': self.apply_date_filter,
-            'news_company': self.fix_news_parameters,
+            'news_company': self.limit_news_company,
         }
     
     def should_limit(self, endpoint: str) -> bool:
@@ -48,14 +49,63 @@ class ResponseLimiter:
             return self.apply_date_filter_params(params)
         elif endpoint == 'news_company':
             return self.fix_news_parameters(params)
+        elif endpoint == 'etf_equity_exposure':
+            # Ensure limit is set for ETF exposure
+            if 'limit' not in params:
+                params['limit'] = 30
         return params
     
+    def limit_etf_holdings(self, data: Any) -> Any:
+        """Limit ETF holdings to top positions by weight"""
+        if isinstance(data, list):
+            # If it's a list of holdings, limit to top 100 by weight
+            if len(data) > 100:
+                try:
+                    # Sort by weight/value if available
+                    sorted_data = sorted(
+                        data,
+                        key=lambda x: float(x.get('weight', x.get('market_value', x.get('value', 0)))),
+                        reverse=True
+                    )
+                    logger.info(f"Limited ETF holdings from {len(data)} to 100 positions")
+                    return sorted_data[:100]
+                except Exception as e:
+                    logger.error(f"Error sorting ETF holdings: {e}")
+                    return data[:100]
+            return data
+        elif isinstance(data, dict):
+            # SEC provider returns complex structure with results
+            if 'results' in data and isinstance(data['results'], list):
+                for result in data['results']:
+                    # Look for holdings in the nested structure
+                    if 'holdings' in result and isinstance(result['holdings'], list):
+                        if len(result['holdings']) > 100:
+                            try:
+                                sorted_holdings = sorted(
+                                    result['holdings'],
+                                    key=lambda x: float(x.get('weight', x.get('market_value', x.get('value', 0)))),
+                                    reverse=True
+                                )
+                                logger.info(f"Limited ETF holdings from {len(result['holdings'])} to 100 positions")
+                                result['holdings'] = sorted_holdings[:100]
+                            except:
+                                result['holdings'] = result['holdings'][:100]
+                    
+                    # Also check for securities_lending if it exists
+                    if 'securities_lending' in result and isinstance(result['securities_lending'], list):
+                        if len(result['securities_lending']) > 10:
+                            result['securities_lending'] = result['securities_lending'][:10]
+                            logger.info("Limited securities lending data to 10 entries")
+            return data
+        return data
+    
     def limit_etf_equity_exposure(self, data: List[Dict]) -> List[Dict]:
-        """Limit ETF equity exposure to top 50 ETFs by weight/importance"""
+        """Limit ETF equity exposure to top 30 ETFs by weight"""
         if not isinstance(data, list):
             return data
             
-        if len(data) <= 50:
+        # Limit to 30 items for better context while staying under token limit
+        if len(data) <= 30:
             return data
         
         # Sort by weight if available, otherwise by market value
@@ -65,12 +115,12 @@ class ResponseLimiter:
                 key=lambda x: float(x.get('weight', x.get('market_value', 0))), 
                 reverse=True
             )
-            logger.info(f"Limited ETF exposure from {len(data)} to 50 items")
-            return sorted_data[:50]
+            logger.info(f"Limited ETF exposure from {len(data)} to 30 items")
+            return sorted_data[:30]
         except Exception as e:
             logger.error(f"Error sorting ETF exposure data: {e}")
-            # If sorting fails, just return first 50
-            return data[:50]
+            # If sorting fails, just return first 30
+            return data[:30]
     
     def limit_company_facts(self, data: Dict) -> Dict:
         """Limit company facts to most recent 2 years of data"""
@@ -158,6 +208,24 @@ class ResponseLimiter:
         """This is called on response data, but filtering should happen in params"""
         return data
     
+    def limit_news_company(self, data: Any) -> Any:
+        """Limit news_company response to prevent token overflow"""
+        # Handle both list and dict responses
+        if isinstance(data, list):
+            # If it's a list of news items, limit to 50 most recent
+            if len(data) > 50:
+                logger.info(f"Limited news items from {len(data)} to 50")
+                return data[:50]
+            return data
+        elif isinstance(data, dict):
+            # Some providers return dict with 'results' key
+            if 'results' in data and isinstance(data['results'], list):
+                if len(data['results']) > 50:
+                    logger.info(f"Limited news results from {len(data['results'])} to 50")
+                    data['results'] = data['results'][:50]
+            return data
+        return data
+    
     def fix_news_parameters(self, params: Dict) -> Dict:
         """Ensure correct parameter types for news endpoints"""
         # Fix limit parameter type
@@ -166,10 +234,17 @@ class ResponseLimiter:
                 try:
                     params['limit'] = int(params['limit'])
                 except ValueError:
-                    params['limit'] = 20
+                    params['limit'] = 50
         else:
             # Set default limit to prevent token overflow
-            params['limit'] = 20
+            params['limit'] = 50
+        
+        # Add date filtering for yfinance to reduce response size
+        if params.get('provider') == 'yfinance' and 'start_date' not in params:
+            # Default to last 7 days for yfinance
+            params['start_date'] = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            params['end_date'] = datetime.now().strftime('%Y-%m-%d')
+            logger.info(f"Added date filter for yfinance news: {params['start_date']} to {params['end_date']}")
         
         # Ensure provider is set
         if 'provider' not in params:

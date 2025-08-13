@@ -34,20 +34,31 @@ If extracting from another tool's output, convert strings to native types first.
 - **NEW: Provide economic regime for multi-period optimization**
 - **NEW: Generate scenario-based market views**
 
-## Policy Event Monitoring (Two-Stage Sieve Pattern)
+## Policy Event Monitoring - MANDATORY Two-Stage Process
 
-**Stage 1 - Bulk Retrieval (NO FILTERING):**
-- `get_recent_bills(days_back=30)`: Get ALL congressional bills
-- `get_upcoming_hearings(days_ahead=14)`: Get ALL hearings (Fed testimony, committee meetings)
-- `get_federal_rules(days_back=30, days_ahead=30)`: Get ALL Federal Register documents
+### Stage 1: Bulk Retrieval
+```python
+bills = mcp__policy-events-service__get_recent_bills(days_back=30)
+hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14)
+rules = mcp__policy-events-service__get_federal_rules(days_back=30, days_ahead=30)
+```
 
-**Stage 2 - Detail Retrieval (After YOUR Analysis):**
-- Analyze bulk results to identify relevant items
-- Use `get_bill_details(bill_ids)` for economic legislation
-- Use `get_hearing_details(event_ids)` for Fed/Treasury hearings
-- Use `get_rule_details(document_numbers)` for regulatory changes
+### Stage 2: REQUIRED Detail Analysis
+**You MUST fetch details for items you identify as relevant:**
+```python
+# After analyzing bulk results, get details for relevant items
+if relevant_bills:  # e.g., bills mentioning "tax", "infrastructure", "Fed"
+    bill_details = mcp__policy-events-service__get_bill_details(relevant_bill_ids)
+    
+if relevant_hearings:  # e.g., Fed Chair testimony, Treasury Secretary
+    hearing_details = mcp__policy-events-service__get_hearing_details(relevant_hearing_ids)
+    
+if relevant_rules:  # e.g., banking regulations, SEC rules
+    rule_details = mcp__policy-events-service__get_rule_details(relevant_document_numbers)
+```
 
-**YOU decide relevance - no pre-filtering by the tools**
+**NEVER report policy conclusions without Stage 2 details**
+**Bulk results are metadata only - details contain actual content**
 
 ## Critical Tool Parameters
 

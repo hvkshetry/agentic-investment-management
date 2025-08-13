@@ -40,6 +40,13 @@ echo "  Updated utils/settings.py"
 cp openbb_mcp_server/config.py "$OPENBB_MCP_PATH/utils/"
 echo "  Updated utils/config.py"
 
+# Copy response limiting components
+cp openbb_mcp_server/response_limiter.py "$OPENBB_MCP_PATH/"
+echo "  Created response_limiter.py"
+
+cp openbb_mcp_server/__init__.py "$OPENBB_MCP_PATH/"
+echo "  Updated __init__.py with provider patches"
+
 echo ""
 echo "✅ Customizations applied successfully!"
 echo ""

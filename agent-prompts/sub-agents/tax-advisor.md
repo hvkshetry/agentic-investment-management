@@ -173,13 +173,38 @@ For ALL tax analyses, generate: `/reports/Tax_Analysis_[Topic]_[YYYY-MM-DD].md`
 }
 ```
 
-## Tax Reform Monitoring
+## Tax Reform Monitoring - Two-Stage Process
 
-**Material Bills:** `mcp__policy-events-service__get_recent_bills, mcp__policy-events-service__get_federal_rules, mcp__policy-events-service__get_upcoming_hearings`
-- committees=["ways_and_means", "finance"] for tax legislation
-- min_materiality=7 for major tax code changes
-- Check affected_sectors="tax_policy" in response
-- status="MARKED_UP" = imminent committee action
+### Stage 1: Scan for Tax Legislation
+```python
+bills = mcp__policy-events-service__get_recent_bills(days_back=30)
+hearings = mcp__policy-events-service__get_upcoming_hearings(days_ahead=14)
+rules = mcp__policy-events-service__get_federal_rules(days_back=30, days_ahead=30)
+```
+
+### Stage 2: REQUIRED Tax Impact Analysis
+```python
+# Identify tax-related legislation
+tax_bills = [b["bill_id"] for b in bills 
+             if any(committee in b.get("committees", []) 
+             for committee in ["ways_and_means", "finance"])
+             or "tax" in b.get("title", "").lower()]
+
+tax_hearings = [h["event_id"] for h in hearings 
+                if "Treasury" in h.get("key_officials", [])
+                or "tax" in h.get("topic", "").lower()]
+
+# MUST fetch details before tax analysis
+if tax_bills:
+    bill_details = mcp__policy-events-service__get_bill_details(tax_bills)
+    # Analyze specific provisions: capital gains, SALT, estate tax
+    
+if tax_hearings:
+    hearing_details = mcp__policy-events-service__get_hearing_details(tax_hearings)
+    # Assess policy direction and timeline
+```
+
+**DO NOT report tax changes without reading actual legislative text**
 
 ## Enhanced Analysis
 
