@@ -42,13 +42,51 @@ If extracting from another tool's output, convert strings to native types first.
 - FTD analysis for squeeze risk assessment (SEC - free)
 - Market friction monitoring via comprehensive shorts data
 
+## CRITICAL: Analyzing Rebalancing Candidates
+
+When analyzing multiple portfolio candidates:
+1. **MUST use candidate-specific weights** for each analysis
+2. **MUST run separate stress tests** for each candidate
+3. **MUST NOT reuse stress results** from current portfolio
+
+Example for analyzing candidates:
+```python
+# Get current portfolio
+state = mcp__portfolio-state-server__get_portfolio_state()
+current_value = state["summary"]["total_value"]  # Use ACTUAL value
+
+# For EACH candidate (e.g., from optimization_candidates.json):
+for candidate in candidates:
+    # Use CANDIDATE weights, not current weights
+    candidate_weights = candidate["proposed_weights"]
+    
+    # Run stress test with CANDIDATE weights
+    stress_results = mcp__risk-server__stress_test_portfolio(
+        returns=historical_returns,
+        weights=candidate_weights,  # CRITICAL: Use candidate weights
+        scenarios=[...]
+    )
+    
+    # Store results separately per candidate
+    results[candidate["id"]] = stress_results
+```
+
+**VALIDATION**: If all candidates show identical stress results, something is wrong!
+
 ## MCP Server Tools
 
 ### MANDATORY: Full Portfolio Analysis
 When calling analyze_portfolio_risk:
 - tickers: ALL positions from portfolio_state (all 55+, not subset)
 - weights: **REQUIRED PARAMETER** - Extract from portfolio_state["tickers_and_weights"]["weights"]
-- analysis_options: MUST include {"use_portfolio_state": true, "portfolio_value": <actual_value>}
+- analysis_options: MUST include {"use_portfolio_state": true, "portfolio_value": <actual_value from portfolio_state>}
+
+**CRITICAL: Portfolio Value MUST come from portfolio_state**
+```python
+state = mcp__portfolio-state-server__get_portfolio_state()
+actual_value = state["summary"]["total_value"]  # e.g., 5157612.29
+# NEVER use hardcoded values like 1000000
+```
 
 **CRITICAL: weights parameter is REQUIRED - you cannot omit it**
 **If tool returns validation errors: STOP and report failure - don't use fake data**

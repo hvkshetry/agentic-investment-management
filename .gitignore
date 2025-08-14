@@ -45,9 +45,19 @@ DRAFT_*.md
 *_BACKUP.md
 
 # Data files (keep sample data out of repo)
-sample_portfolio.jsonoracle/
+sample_portfolio.json
 
-# Additional cleanup entries
+# Cache and state files
+shared/cache/*.json
+portfolio-state-mcp-server/state/*.json
+data/*:Zone.Identifier
+
+# Runs and session data
+runs/
+
+# Oracle build artifacts (keep only source)
+oracle/__pycache__/
+oracle/*.pyc
 git_push_command.txt
 push_to_github.*
 *_backup_*.json

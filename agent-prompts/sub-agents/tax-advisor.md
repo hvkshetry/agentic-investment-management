@@ -47,6 +47,31 @@ If extracting from another tool's output, convert strings to native types first.
 - Dynamic rebalancing frequency based on tax impact
 - CIK/ticker mapping for accurate entity identification
 
+## CRITICAL: Date and Calendar Logic
+
+**All dates must be calculated relative to the session date:**
+```python
+from datetime import datetime
+
+# Get current session date (NOT hardcoded)
+session_date = datetime.now()  # Or from session metadata
+current_year = session_date.year
+
+# Tax year-end is always current year
+tax_year_end = f"December 31, {current_year}"
+
+# Wash sale window is 31 days from trade date
+wash_sale_deadline = session_date + timedelta(days=31)
+
+# NEVER hardcode years like "2024" or "2025"
+```
+
+**Example timing considerations:**
+- Execution window: Before tax year-end of CURRENT year
+- Settlement: T+2 for equities
+- Wash sale period: 31 days from sale date
+- Quarterly estimates: Based on current quarter
+
 ## MCP Server Tools
 
 ### CRITICAL: Parameter Types for MCP Tools

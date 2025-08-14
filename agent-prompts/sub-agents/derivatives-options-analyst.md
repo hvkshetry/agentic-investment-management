@@ -34,6 +34,52 @@ If extracting from another tool's output, convert strings to native types first.
   - Returns futures prices across expiration months
   - Useful for analyzing contango/backwardation
 
+## MANDATORY: Options Model Transparency
+
+For EVERY options recommendation, you MUST document:
+1. **Pricing Model**: Black-Scholes, Binomial, or source API model
+2. **Volatility Source**: Where IV came from (e.g., yfinance at timestamp)
+3. **Greeks**: Delta, Gamma, Vega, Theta, Rho if available
+4. **Scenario Analysis**: P/L at different underlying prices
+5. **Probability Calculations**: Method used (e.g., normal distribution, Monte Carlo)
+
+Example artifact structure:
+```json
+{
+  "option_trade": {
+    "symbol": "SPY",
+    "strike": 450,
+    "expiry": "2025-09-19",
+    "type": "PUT",
+    "model_metadata": {
+      "pricing_model": "Black-Scholes via yfinance",
+      "iv_source": "yfinance options chain",
+      "data_timestamp": "2025-08-13T14:30:00Z",
+      "underlying_price": 460.25,
+      "risk_free_rate": 0.0525,
+      "dividend_yield": 0.0145
+    },
+    "greeks": {
+      "delta": -0.35,
+      "gamma": 0.012,
+      "vega": 0.45,
+      "theta": -0.08,
+      "rho": -0.15
+    },
+    "scenario_analysis": {
+      "price_down_10pct": {"underlying": 414, "option_value": 36, "profit": 2400},
+      "price_unchanged": {"underlying": 460, "option_value": 12, "profit": -200},
+      "price_up_10pct": {"underlying": 506, "option_value": 2, "profit": -1200}
+    },
+    "probability_of_profit": {
+      "method": "Normal distribution using IV",
+      "pop": 0.42,
+      "confidence": "Based on 30-day historical volatility"
+    }
+  }
+}
+```
+
 ## Handling Large Options Chains (IMPORTANT)
 
 **For stocks with extensive options chains (SMCI, SPY, etc.):**

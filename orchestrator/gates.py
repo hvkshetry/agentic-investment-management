@@ -7,6 +7,7 @@ Enforces risk and tax constraints before allowing trades
 from typing import Dict, Any, List, Tuple
 from dataclasses import dataclass
 import logging
+from .position_lookthrough import PositionLookthrough
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class RiskGate:
     # Risk limits
     MAX_DAILY_VAR = 0.025  # 2.5% daily VaR
     MAX_DRAWDOWN = 0.20    # 20% maximum drawdown
-    MAX_SINGLE_POSITION = 0.25  # 25% concentration limit
+    MAX_SINGLE_COMPANY = 0.10  # 10% concentration limit for single companies (not funds)
     MIN_SHARPE = 0.3       # Minimum Sharpe ratio
     MAX_CORRELATION = 0.85  # Maximum correlation clustering
     
@@ -49,11 +50,25 @@ class RiskGate:
         if sharpe < cls.MIN_SHARPE:
             failures.append(f"Sharpe below minimum: {sharpe:.2f} < {cls.MIN_SHARPE:.2f}")
             
-        # Check concentration
+        # NEW: Use look-through analysis for concentration check
         positions = payload.get("positions", {})
+        lookthrough = PositionLookthrough(concentration_limit=cls.MAX_SINGLE_COMPANY)
+        
+        # Check if positions are funds or individual stocks
         for symbol, weight in positions.items():
-            if weight > cls.MAX_SINGLE_POSITION:
-                failures.append(f"Position too concentrated: {symbol} = {weight:.2%}")
+            # Skip concentration check for diversified funds
+            if lookthrough.is_fund(symbol):
+                logger.info(f"{symbol} is a fund at {weight:.2%} weight - applying look-through analysis")
+            else:
+                # Direct holding of individual stock
+                if weight > cls.MAX_SINGLE_COMPANY:
+                    failures.append(f"Single company position too concentrated: {symbol} = {weight:.2%} > {cls.MAX_SINGLE_COMPANY:.2%}")
+        
+        # Perform look-through concentration analysis
+        concentration_result = lookthrough.check_concentration_limits(positions)
+        if not concentration_result.passed:
+            for symbol, concentration in concentration_result.violations:
+                failures.append(f"Look-through concentration violation: {symbol} = {concentration:.2%} > {cls.MAX_SINGLE_COMPANY:.2%}")
                 
         # Check stress tests
         stress_tests = payload.get("stress_tests", {})
@@ -65,13 +80,28 @@ class RiskGate:
             return GateResult(
                 passed=False,
                 reason="; ".join(failures),
-                details={"failures": failures, "metrics": payload}
+                details={
+                    "failures": failures, 
+                    "metrics": payload,
+                    "concentration_analysis": {
+                        "max_company_exposure": concentration_result.max_concentration,
+                        "max_company_symbol": concentration_result.max_concentration_symbol,
+                        "violations": concentration_result.violations
+                    } if 'concentration_result' in locals() else {}
+                }
             )
             
         return GateResult(
             passed=True,
             reason="All risk checks passed",
-            details={"metrics": payload}
+            details={
+                "metrics": payload,
+                "concentration_analysis": {
+                    "max_company_exposure": concentration_result.max_concentration,
+                    "max_company_symbol": concentration_result.max_concentration_symbol,
+                    "passed": True
+                } if 'concentration_result' in locals() else {}
+            }
         )
 
 class TaxGate:

@@ -1,201 +1,113 @@
-# AI Investment Management System
+# Institutional Portfolio Management System
 
-An institutional-grade, workflow-driven investment platform that orchestrates specialized AI agents through deterministic workflows to deliver comprehensive portfolio management, risk analysis, and tax optimization.
+A workflow-driven investment platform orchestrating specialized agents for portfolio management, risk analytics, and regulatory compliance.
 
-## Key Innovation: Workflow-Driven Architecture
+## Architecture
 
-This system represents a paradigm shift from ad-hoc tool usage to **deterministic, workflow-driven portfolio management**. Instead of agents making isolated decisions, they collaborate through structured workflows with defined stages, gates, and validation layers.
+### Workflow-Driven Design
+- Deterministic execution via YAML-defined workflows
+- Policy gates enforce risk and compliance constraints
+- Standardized artifact contracts between agents
+- Complete audit trail in `./runs/<timestamp>/`
 
-### Core Principles
-- **Declarative Workflows**: Define investment processes in YAML, not code
-- **Policy Gates**: Automated compliance checks prevent pathological optimizations
-- **Artifact Contracts**: Standardized data flow between agents
-- **Audit Trail**: Complete session history in `./runs/<timestamp>/`
-- **Natural Language Control**: Seed workflows with plain English instructions
+### Components
 
-## System Architecture
+**Orchestration Layer**: Main workflow coordinator (`main_workflow.py`)
 
-### Three-Layer Design
+**Specialist Agents**:
+- Portfolio Manager: Position management and rebalancing
+- Risk Analyst: VaR, stress testing, concentration analysis
+- Tax Advisor: Tax-loss harvesting, wash sale prevention
+- Market Scanner: Opportunity identification
+- Allocation Agent: Strategic and tactical allocation
 
-```
-┌─────────────────────────────────────────┐
-│         Orchestration Layer             │
-│         (CLAUDE.md - Main AI)           │
-└─────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────┐
-│         Workflow Engine                  │
-│   (Declarative YAML Configurations)      │
-│                                          │
-│  • rebalance_tlh.yaml                   │
-│  • daily_check.yaml                     │
-│  • portfolio_import.yaml                │
-│  • [Your custom workflows...]           │
-└─────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────┐
-│        Specialist Agents (12)           │
-│                                          │
-│  Domain Experts:        Validators:     │
-│  • portfolio-manager    • gate-validator│
-│  • risk-analyst        • ic-memo-gen    │
-│  • tax-advisor         • invariant-check│
-│  • equity-analyst                       │
-│  • macro-analyst       [Extensible]     │
-│  • fixed-income-analyst                 │
-│  • market-scanner                       │
-│  • etf-analyst                          │
-│  • derivatives-analyst                  │
-└─────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────┐
-│         MCP Server Layer                │
-│                                          │
-│  • portfolio-state-server (Truth)       │
-│  • risk-server-v3                       │
-│  • portfolio-optimization-v3            │
-│  • tax-server-v2                        │
-│  • tax-optimization-oracle              │
-│  • openbb-curated (44 tools)           │
-│  • policy-events-service                │
-└─────────────────────────────────────────┘
-```
+**MCP Servers**:
+- `portfolio-state-server`: Single source of truth for holdings
+- `risk-server-v3`: Advanced risk metrics (VaR, CVaR, stress tests)
+- `portfolio-optimization-v3`: PyPortfolioOpt + Riskfolio-Lib
+- `tax-server-v2`: Federal/state tax calculations
+- `openbb-curated`: 44 financial data tools
+- `policy-events-service`: Congressional bills, federal rules
 
-## Pre-Built Workflows
+## Workflows
 
-### 1. **Portfolio Rebalancing with Tax Loss Harvesting** (`rebalance_tlh.yaml`)
-Full institutional-grade rebalancing with multiple optimization methods, risk validation, and tax efficiency.
+### Portfolio Rebalancing (`rebalance_tlh.yaml`)
+- Multi-strategy optimization (HRP, MaxSharpe, MinVol)
+- Tax-loss harvesting integration
+- Policy gate validation
+- IC memo generation
 
-**Natural Language Trigger:**
-```
-"Rebalance my portfolio to 80% equity / 20% fixed income with tax efficiency"
-```
+### Daily Monitoring (`daily_check.yaml`)
+- Risk alerts and action triggers
+- Performance attribution
+- Compliance checks
 
-**Workflow Stages:**
-1. Portfolio import from CSV
-2. Parallel market analysis (macro, equity, fixed income)
-3. Multiple optimization candidates (HRP, MaxSharpe, etc.)
-4. Risk validation and stress testing
-5. Tax impact analysis and harvesting
-6. Policy gate validation
-7. Final selection and trade list
-8. IC memo generation
+### Portfolio Import (`portfolio_import.yaml`)
+- CSV import from major brokers
+- Data validation and normalization
 
-### 2. **Daily Portfolio Check** (`daily_check.yaml`)
-Lightweight morning monitoring with risk alerts and action triggers.
+## Risk Management
 
-**Natural Language Trigger:**
-```
-"Run my daily portfolio check"
-```
+### Concentration Limits
+- Single security: 10% maximum
+- ETF look-through analysis for true exposure
+- Sector concentration: 30% maximum
 
-### 3. **Portfolio Import** (`portfolio_import.yaml`)
-Import and validate portfolio data from broker CSV files.
+### Risk Metrics
+- Value at Risk (95% confidence)
+- Stress testing scenarios
+- Sharpe ratio constraints
 
-**Natural Language Trigger:**
-```
-"Import my portfolio statements from Vanguard and UBS"
-```
+## Key Features
 
-## Policy Gates System
+### Position Look-Through Analysis
+- Analyzes underlying ETF/fund holdings
+- Aggregates true exposure across positions
+- CUSIP-based security identification
+- Supports 10,000+ fund mappings
 
-### Automated Safeguards
-- **Risk Gate**: VaR limits, Sharpe minimums, stress test thresholds
-- **Tax Gate**: Wash sale prevention, loss harvesting rules
-- **Compliance Gate**: Regulatory requirements, account minimums
-- **Realism Gate**: Prevents impossible Sharpe ratios (>3.0)
-- **Credibility Gate**: Multi-source validation requirements
+### Tax Optimization
+- Municipal bond identification
+- Foreign tax credit tracking
+- Wash sale rule compliance
+- Tax-loss harvesting workflows
 
-### Example: Preventing GEV Pathology
-```yaml
-# config/policy/risk_limits.yaml
-position_limits:
-  max_single_position: 0.10  # 10% max prevents 25% GEV issue
-  min_positions: 20          # Ensures diversification
-```
-
-## Creating Custom Workflows
-
-Workflows are defined in YAML and live in `config/workflows/`. Here's a template:
-
-```yaml
-workflow: your_workflow_name
-description: What this workflow accomplishes
-schedule: on_demand  # or: daily, weekly, monthly
-
-# Token budget (guideline, not hard limit)
-guidelines:
-  target_tokens: 50000
-
-# Agent sequence with dependencies
-sub_agents_sequence:
-  - id: step_1
-    name: portfolio-manager
-    task: |
-      Your detailed task instructions here
-    outputs: [artifact_name]
-    
-  - id: step_2
-    name: risk-analyst
-    task: |
-      Analyze the portfolio for risk
-    depends_on: [step_1]
-    outputs: [risk_report]
-    gates: [risk_gate]
-
-# Gate definitions
-gates:
-  risk_gate:
-    checks:
-      - var_95 <= 0.02
-      - sharpe_ratio >= 0.5
-
-# Action triggers
-triggers:
-  alert_user:
-    conditions:
-      - risk_level == "HIGH"
-    action: send_notification
-```
-
-## Getting Started
+## Installation
 
 ### Prerequisites
-1. **Claude Code CLI** installed and configured
-2. **Python 3.10+** with virtual environment
-3. **WSL/Linux** (recommended) or macOS
-4. **Portfolio CSV files** in supported format
+- Python 3.10+
+- OpenBB Platform
+- SEC data files (provided in `data/`)
 
-### Installation
-
-1. Clone the repository:
+### Setup
 ```bash
-git clone https://github.com/[your-username]/ai-investment-management.git
-cd ai-investment-management
-```
+# Clone repository
+git clone https://github.com/yourusername/portfolio-manager.git
+cd portfolio-manager
 
-2. Set up Python environment:
-```bash
-python -m venv openbb
+# Create virtual environment
+python3 -m venv openbb
 source openbb/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-3. Configure MCP servers in `~/.claude/settings.json`:
-```json
-{
-  "mcpServers": {
-    "portfolio-state-server": {
-      "command": "python",
-      "args": ["[path]/portfolio-state-mcp-server/state_server.py"]
-    },
-    "risk-server-v3": {
-      "command": "python",
-      "args": ["[path]/risk-mcp-server-v3/risk_server.py"]
-    }
-    // ... other servers
-  }
-}
+## Data Sources
+
+- **Market Data**: OpenBB Platform (SEC, Yahoo Finance)
+- **Regulatory**: SEC EDGAR, Congress.gov API
+- **Reference Data**: FinanceDatabase (300k+ symbols)
+- **CUSIP Mappings**: SEC 13F filings
+
+## Testing
+
+```bash
+# Run comprehensive integration test
+python tests/test_comprehensive_integration.py
+
+# Test CUSIP mappings
+python build_cusip_cik_mapping.py
 ```
 
 4. Place portfolio CSVs in designated directory:
