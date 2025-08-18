@@ -12,7 +12,7 @@ from scipy import stats
 import logging
 import sys
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Add shared modules to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
@@ -425,27 +425,30 @@ async def analyze_portfolio_risk(
         result["etf_lookthrough_concentration"] = {
             "max_single_name_exposure": concentration_result.max_concentration,
             "max_single_name_ticker": concentration_result.max_concentration_symbol,
-            "broad_market_exposure": concentration_result.details.get('broad_market_total_weight', 0),
+            "funds_total_weight": concentration_result.details.get('funds_total_weight', 0),
+            "individuals_total_weight": concentration_result.details.get('individuals_total_weight', 0),
             "concentration_breach": not concentration_result.passed,
             "single_name_limit": concentration_result.details['limit'],
             "violations": concentration_result.violations,
-            "broad_market_etfs": concentration_result.details.get('broad_market_etfs', {}),
-            "broad_market_exempt": concentration_result.details.get('broad_market_exempt', True)
+            "fund_positions": concentration_result.details.get('fund_positions', {}),
+            "individual_positions": concentration_result.details.get('individual_positions', {}),
+            "all_funds_exempt": concentration_result.details.get('all_funds_exempt', True)
         }
         
-        # Check if any individual position exceeds limits (excluding broad market ETFs)
-        non_broad_market_breach = False
+        # Check if any individual stock (not fund) exceeds limits
+        individual_stock_breach = False
         for ticker, weight in zip(tickers, weights):
-            if ticker not in position_lookthrough.BROAD_MARKET_ETFS and weight > 0.20:
-                non_broad_market_breach = True
+            # Only check individual stocks, not funds
+            if not position_lookthrough.is_fund(ticker) and weight > 0.20:
+                individual_stock_breach = True
                 break
         
         result["concentration_analysis"] = {
             "simple_max_position": float(np.max(weights)),
             "simple_max_ticker": tickers[np.argmax(weights)],
             "etf_lookthrough_max": concentration_result.max_concentration,
-            "concentration_limit_breach": not concentration_result.passed or non_broad_market_breach,
-            "broad_market_etfs_exempt_from_limits": True,
+            "concentration_limit_breach": not concentration_result.passed or individual_stock_breach,
+            "all_funds_exempt_from_limits": True,
             "concentration_report": position_lookthrough.get_concentration_report(portfolio_dict)
         }
         
