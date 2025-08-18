@@ -30,6 +30,26 @@ class PositionLookthrough:
     # ETF/Fund types that need look-through analysis
     FUND_TYPES = {'ETF', 'MUTUALFUND', 'CEF'}  # Closed-End Fund
     
+    # Broad market ETFs EXEMPT from single-position concentration limits
+    BROAD_MARKET_ETFS = {
+        'VTI',   # Vanguard Total Stock Market
+        'VOO',   # Vanguard S&P 500
+        'SPY',   # SPDR S&P 500
+        'IVV',   # iShares Core S&P 500
+        'VT',    # Vanguard Total World Stock
+        'VXUS',  # Vanguard Total International Stock
+        'IXUS',  # iShares Core MSCI Total International
+        'ACWI',  # iShares MSCI ACWI
+        'URTH',  # iShares MSCI World
+        'ITOT',  # iShares Core S&P Total Market
+        'SCHB',  # Schwab US Broad Market
+        'VEA',   # Vanguard Developed Markets
+        'VWO',   # Vanguard Emerging Markets
+        'IEFA',  # iShares Core MSCI EAFE
+        'EFA',   # iShares MSCI EAFE
+        'IEMG',  # iShares Core MSCI Emerging Markets
+    }
+    
     # Cache for fund holdings to avoid repeated API calls
     _holdings_cache = {}
     
@@ -381,6 +401,7 @@ class PositionLookthrough:
     def check_concentration_limits(self, portfolio: Dict[str, float]) -> ConcentrationResult:
         """
         Check if portfolio meets concentration limits
+        Broad market ETFs are EXEMPT from single-position limits
         
         Args:
             portfolio: Dictionary of {symbol: weight_in_portfolio}
@@ -388,8 +409,18 @@ class PositionLookthrough:
         Returns:
             ConcentrationResult with pass/fail and details
         """
-        # Calculate true concentration
-        company_exposure = self.calculate_concentration(portfolio)
+        # Separate broad market ETFs from other positions
+        broad_market_positions = {}
+        other_positions = {}
+        
+        for ticker, weight in portfolio.items():
+            if ticker.upper() in self.BROAD_MARKET_ETFS:
+                broad_market_positions[ticker] = weight
+            else:
+                other_positions[ticker] = weight
+        
+        # Calculate true concentration only for non-broad-market positions
+        company_exposure = self.calculate_concentration(other_positions)
         
         # Find violations
         violations = []
@@ -420,7 +451,10 @@ class PositionLookthrough:
                 'company_exposures': company_exposure,
                 'limit': self.concentration_limit,
                 'total_companies': len(company_exposure),
-                'companies_over_5pct': sum(1 for c in company_exposure.values() if c > 0.05)
+                'companies_over_5pct': sum(1 for c in company_exposure.values() if c > 0.05),
+                'broad_market_etfs': broad_market_positions,
+                'broad_market_total_weight': sum(broad_market_positions.values()),
+                'broad_market_exempt': True
             }
         )
         
@@ -438,12 +472,20 @@ class PositionLookthrough:
         
         report = "# Concentration Risk Analysis (Look-Through)\n\n"
         
+        # Show broad market ETF exemption
+        if result.details.get('broad_market_etfs'):
+            broad_market_weight = result.details.get('broad_market_total_weight', 0)
+            report += f"📊 **Broad Market ETFs**: {broad_market_weight:.1%} (EXEMPT from concentration limits)\n"
+            for etf, weight in result.details['broad_market_etfs'].items():
+                report += f"  - {etf}: {weight:.2%}\n"
+            report += "\n"
+        
         if result.passed:
             report += f"✅ **PASSED**: No single company exceeds {self.concentration_limit:.1%} limit\n\n"
         else:
             report += f"❌ **FAILED**: {len(result.violations)} companies exceed {self.concentration_limit:.1%} limit\n\n"
             
-        report += f"**Maximum Concentration**: {result.max_concentration_symbol} at {result.max_concentration:.2%}\n\n"
+        report += f"**Maximum Single-Name Concentration**: {result.max_concentration_symbol} at {result.max_concentration:.2%}\n\n"
         
         if result.violations:
             report += "## Violations\n"

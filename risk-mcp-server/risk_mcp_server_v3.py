@@ -12,7 +12,7 @@ from scipy import stats
 import logging
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add shared modules to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
@@ -21,6 +21,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
 from data_pipeline import MarketDataPipeline
 from confidence_scoring import ConfidenceScorer
 from portfolio_state_client import get_portfolio_state_client
+from risk_conventions import RiskConventions, RiskStack
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'orchestrator'))
+from position_lookthrough import PositionLookthrough
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +38,7 @@ server = FastMCP("Risk Analyzer v3 - Consolidated")
 data_pipeline = MarketDataPipeline()
 confidence_scorer = ConfidenceScorer()
 portfolio_state_client = get_portfolio_state_client()
+position_lookthrough = PositionLookthrough(concentration_limit=0.20)  # 20% limit for single names
 
 @server.tool()
 async def analyze_portfolio_risk(
@@ -148,9 +152,10 @@ async def analyze_portfolio_risk(
         rf_data = data_pipeline.get_risk_free_rate('10y')
         risk_free_rate = rf_data['rate']
         
-        # Initialize result structure
+        # Initialize result structure with risk_stack
         result = {
             "portfolio_summary": {},
+            "risk_stack": None,  # Will be populated with RiskStack object
             "risk_metrics": {
                 "basic": {},
                 "var_analysis": {},
@@ -209,7 +214,243 @@ async def analyze_portfolio_risk(
         }
         
         # =========================
-        # 3. VAR ANALYSIS
+        # 3. BUILD COMPREHENSIVE RISK STACK (ES PRIMARY)
+        # =========================
+        
+        # Calibrate ES limit from historical VaR policy
+        historical_var_limit = 0.02  # 2% VaR limit
+        es_limit = RiskConventions.calibrate_es_from_var(
+            portfolio_returns,
+            var_limit=historical_var_limit,
+            var_alpha=0.95,
+            es_alpha=0.975,
+            target_breach_freq=0.05
+        )
+        
+        # Calculate Expected Shortfall (primary metric)
+        es_975 = RiskConventions.compute_expected_shortfall(
+            portfolio_returns,
+            alpha=0.975,
+            horizon_days=1,
+            method="historical"
+        )
+        
+        es_99 = RiskConventions.compute_expected_shortfall(
+            portfolio_returns,
+            alpha=0.99,
+            horizon_days=1,
+            method="historical"
+        )
+        
+        # Calculate VaR for reference
+        var_95 = RiskConventions.compute_var(
+            portfolio_returns,
+            confidence=0.95,
+            horizon_days=1,
+            method="historical"
+        )
+        
+        # Fetch Fama-French factors
+        end_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        start_date = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+        
+        try:
+            ff_factors = data_pipeline.fetch_fama_french_factors(
+                start_date=start_date,
+                end_date=end_date,
+                frequency="daily"
+            )
+            
+            # Align dates and compute excess returns
+            portfolio_df = pd.DataFrame(portfolio_returns, index=data['returns'].index, columns=['portfolio'])
+            ff_factors_aligned = ff_factors.reindex(portfolio_df.index).fillna(method='ffill')
+            
+            # Compute excess returns for regression
+            rf_rate_daily = ff_factors_aligned['RF'] if 'RF' in ff_factors_aligned.columns else 0
+            excess_returns = portfolio_df['portfolio'] - rf_rate_daily
+            
+            # Run factor regression with robust standard errors
+            from statsmodels.regression.linear_model import OLS
+            import statsmodels.api as sm
+            
+            factor_cols = ['MKT-RF', 'SMB', 'HML', 'RMW', 'CMA', 'MOM']
+            available_factors = [col for col in factor_cols if col in ff_factors_aligned.columns]
+            
+            if len(available_factors) > 0:
+                X = ff_factors_aligned[available_factors]
+                X = sm.add_constant(X)  # Add intercept
+                
+                # Robust regression
+                model = OLS(excess_returns, X)
+                results = model.fit(cov_type='HAC', cov_kwds={'maxlags': 5})
+                
+                factor_betas = {factor: float(results.params[factor]) for factor in available_factors}
+                factor_betas['alpha'] = float(results.params['const'])
+                
+                # Get confidence intervals
+                conf_int = results.conf_int()
+                factor_ci = {factor: [float(conf_int.loc[factor, 0]), float(conf_int.loc[factor, 1])] 
+                            for factor in available_factors}
+                
+                r_squared = float(results.rsquared)
+                residual_vol = float(np.std(results.resid))
+            else:
+                factor_betas = {}
+                factor_ci = {}
+                r_squared = 0.0
+                residual_vol = float(volatility)
+        except Exception as e:
+            logger.warning(f"Factor analysis failed: {e}, using empty factors")
+            factor_betas = {}
+            factor_ci = {}
+            r_squared = 0.0
+            residual_vol = float(volatility)
+        
+        # Calculate correlation-adjusted concentration metrics
+        returns_df = data['returns']
+        cov_matrix = returns_df.cov().values * 252  # Annualized
+        
+        # Weight-based ENB
+        enb_weight = 1 / np.sum(weights**2)
+        
+        # Correlation-adjusted ENB
+        portfolio_var = weights @ cov_matrix @ weights
+        portfolio_vol_annual = np.sqrt(portfolio_var)
+        marginal_contrib = cov_matrix @ weights
+        risk_contrib = weights * marginal_contrib / portfolio_vol_annual if portfolio_vol_annual > 0 else weights
+        enb_corr_adj = 1 / np.sum(risk_contrib**2) if np.sum(risk_contrib**2) > 0 else enb_weight
+        
+        # Risk contribution Herfindahl
+        risk_contrib_herfindahl = float(np.sum(risk_contrib**2))
+        
+        # Calculate liquidity metrics (placeholder - would need ADV data)
+        # In production, fetch Average Daily Volume (ADV) data
+        liquidity = {
+            "pct_adv_p95": 0.05,  # Placeholder: 5% of ADV
+            "names_over_10pct_adv": 0,  # Placeholder
+            "gross_notional_to_adv": 0.1  # Placeholder
+        }
+        
+        # Path risk with explicit windows
+        # 1-year window (252 trading days)
+        if len(portfolio_returns) >= 252:
+            returns_1y = portfolio_returns[-252:]
+            cumulative_1y = np.cumprod(1 + returns_1y)
+            running_max_1y = np.maximum.accumulate(cumulative_1y)
+            drawdown_1y = (cumulative_1y - running_max_1y) / running_max_1y
+            max_drawdown_1y = float(np.min(drawdown_1y))
+            
+            # Ulcer Index (1-year)
+            ulcer_index_1y = float(np.sqrt(np.mean(drawdown_1y**2)) * 100)
+        else:
+            max_drawdown_1y = max_drawdown
+            ulcer_index_1y = float(np.sqrt(np.mean(drawdown**2)) * 100)
+        
+        # Build comprehensive RiskStack
+        risk_stack = RiskStack(
+            as_of=datetime.now(timezone.utc),
+            lookback_days=lookback_days,
+            horizon_days=1,
+            frequency="daily",
+            units="decimal",
+            sign_convention="positive_loss",
+            
+            loss_based={
+                "es": {
+                    "alpha": 0.975,
+                    "value": abs(es_975["value"]),
+                    "method": "historical",
+                    "horizon_days": 1
+                },
+                "es_99": {
+                    "alpha": 0.99,
+                    "value": abs(es_99["value"]),
+                    "method": "historical",
+                    "horizon_days": 1
+                },
+                "var": {  # Reference only
+                    "alpha": 0.95,
+                    "value": abs(var_95.value),
+                    "method": "historical",
+                    "horizon_days": 1
+                },
+                "downside_semidev": float(downside_dev)
+            },
+            
+            path_risk={
+                "max_drawdown_1y": abs(max_drawdown_1y),
+                "ulcer_index_1y": ulcer_index_1y,
+                "calmar_ratio": float(calmar)
+            },
+            
+            factor_exposures={
+                "window_days": lookback_days,
+                "betas": factor_betas,
+                "beta_ci": factor_ci,
+                "r_squared": r_squared,
+                "residual_vol": residual_vol
+            },
+            
+            concentration={
+                "max_name_weight": float(np.max(weights)),
+                "top5_weight": float(np.sum(sorted(weights)[-5:])),
+                "sector_max_weight": 0.0,  # Would need sector mapping
+                "enb_weight": float(enb_weight),
+                "enb_corr_adj": float(enb_corr_adj),
+                "risk_contrib_herfindahl": risk_contrib_herfindahl
+            },
+            
+            liquidity=liquidity
+        )
+        
+        # Validate the risk stack
+        validation_errors = risk_stack.validate()
+        if validation_errors:
+            logger.warning(f"Risk stack validation warnings: {validation_errors}")
+        
+        # Add risk stack to result
+        result["risk_stack"] = risk_stack.to_dict()
+        result["risk_stack"]["es_limit_calibrated"] = float(es_limit)
+        
+        # =========================
+        # 3b. ETF LOOKTHROUGH CONCENTRATION ANALYSIS
+        # =========================
+        # Create portfolio dictionary for lookthrough analysis
+        portfolio_dict = {ticker: weight for ticker, weight in zip(tickers, weights)}
+        
+        # Calculate true concentration with ETF lookthrough
+        concentration_result = position_lookthrough.check_concentration_limits(portfolio_dict)
+        
+        # Update concentration metrics with lookthrough results
+        result["etf_lookthrough_concentration"] = {
+            "max_single_name_exposure": concentration_result.max_concentration,
+            "max_single_name_ticker": concentration_result.max_concentration_symbol,
+            "broad_market_exposure": concentration_result.details.get('broad_market_total_weight', 0),
+            "concentration_breach": not concentration_result.passed,
+            "single_name_limit": concentration_result.details['limit'],
+            "violations": concentration_result.violations,
+            "broad_market_etfs": concentration_result.details.get('broad_market_etfs', {}),
+            "broad_market_exempt": concentration_result.details.get('broad_market_exempt', True)
+        }
+        
+        # Check if any individual position exceeds limits (excluding broad market ETFs)
+        non_broad_market_breach = False
+        for ticker, weight in zip(tickers, weights):
+            if ticker not in position_lookthrough.BROAD_MARKET_ETFS and weight > 0.20:
+                non_broad_market_breach = True
+                break
+        
+        result["concentration_analysis"] = {
+            "simple_max_position": float(np.max(weights)),
+            "simple_max_ticker": tickers[np.argmax(weights)],
+            "etf_lookthrough_max": concentration_result.max_concentration,
+            "concentration_limit_breach": not concentration_result.passed or non_broad_market_breach,
+            "broad_market_etfs_exempt_from_limits": True,
+            "concentration_report": position_lookthrough.get_concentration_report(portfolio_dict)
+        }
+        
+        # =========================
+        # 3c. TRADITIONAL VAR ANALYSIS (for backward compatibility)
         # =========================
         var_results = {}
         
@@ -595,7 +836,7 @@ async def analyze_portfolio_risk(
         # 9. METADATA
         # =========================
         result["metadata"] = {
-            "analysis_timestamp": datetime.now().isoformat(),
+            "analysis_timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "data_source": data['metadata']['source'],
             "portfolio_source": portfolio_source,
             "lookback_days": lookback_days,

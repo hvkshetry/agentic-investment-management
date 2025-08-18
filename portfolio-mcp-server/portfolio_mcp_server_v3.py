@@ -126,7 +126,24 @@ async def optimize_portfolio_advanced(
         market_views = config.get('market_views', None)
         confidence_level = config.get('confidence_level', 0.95)
         risk_free_rate = config.get('risk_free_rate', None)
+        
+        # Institutional constraints with defaults
+        INSTITUTIONAL_DEFAULTS = {
+            'max_weight': 0.10,           # 10% max position size
+            'min_weight': 0.0,             # No short selling by default
+            'max_sector_weight': 0.35,     # 35% max sector concentration
+            'max_top5_weight': 0.50,       # 50% max for top 5 positions
+            'target_var_95': 0.02,         # 2% daily VaR target
+            'enforce_institutional': True   # Apply institutional limits by default
+        }
+        
+        # Merge user constraints with institutional defaults
         constraints = config.get('constraints', {})
+        if constraints.get('enforce_institutional', True):
+            for key, default_value in INSTITUTIONAL_DEFAULTS.items():
+                if key not in constraints:
+                    constraints[key] = default_value
+            logger.info(f"Applied institutional constraints: max_weight={constraints['max_weight']}, max_sector={constraints.get('max_sector_weight')}")
         discrete_alloc = config.get('discrete_allocation', False)
         use_portfolio_state = config.get('use_portfolio_state', True)  # Default to true - fail loudly
         
@@ -266,9 +283,9 @@ async def optimize_portfolio_advanced(
                     bl_S = bl.bl_cov()
                     
                     # Optimize with Black-Litterman parameters
-                    ef_bl = EfficientFrontier(bl_mu, bl_S)
-                    ef_bl.add_constraint(lambda w: w >= constraints.get('min_weight', 0))
-                    ef_bl.add_constraint(lambda w: w <= constraints.get('max_weight', 1))
+                    # Use weight_bounds for position limits
+                    weight_bounds = (constraints.get('min_weight', 0), constraints.get('max_weight', 0.10))
+                    ef_bl = EfficientFrontier(bl_mu, bl_S, weight_bounds=weight_bounds)
                     
                     bl_weights = ef_bl.max_sharpe(risk_free_rate=risk_free_rate)
                     bl_weights_clean = ef_bl.clean_weights()
@@ -293,11 +310,18 @@ async def optimize_portfolio_advanced(
             # c) Mean-Variance with various objectives
             if 'Mean-Variance' in methods or 'Mean-Risk' in methods:
                 try:
-                    ef = EfficientFrontier(mu, S)
+                    # Use weight_bounds for position limits (enforces hard constraints)
+                    weight_bounds = (constraints.get('min_weight', 0), constraints.get('max_weight', 0.10))
+                    ef = EfficientFrontier(mu, S, weight_bounds=weight_bounds)
                     
-                    # Apply constraints
-                    ef.add_constraint(lambda w: w >= constraints.get('min_weight', 0))
-                    ef.add_constraint(lambda w: w <= constraints.get('max_weight', 1))
+                    # Sector constraints if provided
+                    if 'sector_mapper' in constraints and 'max_sector_weight' in constraints:
+                        sector_mapper = constraints['sector_mapper']
+                        max_sector = constraints['max_sector_weight']
+                        # Create sector upper bounds
+                        sector_upper = {sector: max_sector for sector in set(sector_mapper.values())}
+                        ef.add_sector_constraints(sector_mapper, sector_upper=sector_upper)
+                        logger.info(f"Applied sector constraints with max {max_sector*100:.0f}% per sector")
                     
                     # Cardinality constraint if specified
                     if 'cardinality' in constraints:
@@ -317,10 +341,8 @@ async def optimize_portfolio_advanced(
                         "optimization_success": True
                     }
                     
-                    # Also compute minimum volatility
-                    ef_minvol = EfficientFrontier(mu, S)
-                    ef_minvol.add_constraint(lambda w: w >= constraints.get('min_weight', 0))
-                    ef_minvol.add_constraint(lambda w: w <= constraints.get('max_weight', 1))
+                    # Also compute minimum volatility with same constraints
+                    ef_minvol = EfficientFrontier(mu, S, weight_bounds=weight_bounds)
                     
                     minvol_weights = ef_minvol.min_volatility()
                     minvol_clean = ef_minvol.clean_weights()

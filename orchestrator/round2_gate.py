@@ -75,10 +75,10 @@ class Round2GateResult:
     def requires_halt(self) -> bool:
         """Check if failures require HALT"""
         critical_failures = [
-            "es_limit_breach",
-            "liquidity_crisis", 
-            "tax_inconsistency",
-            "missing_lineage"
+            "es limit breach",  # Changed from underscore to space
+            "liquidity crisis",  # Already correct
+            "tax inconsistency",  # Changed from underscore to space
+            "missing lineage"  # Changed from underscore to space
         ]
         return any(crit in str(self.failures).lower() for crit in critical_failures)
     

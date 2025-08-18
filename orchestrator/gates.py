@@ -7,6 +7,12 @@ Enforces risk and tax constraints before allowing trades
 from typing import Dict, Any, List, Tuple
 from dataclasses import dataclass
 import logging
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+from shared.risk_conventions import RiskConventions, VaRResult
 from .position_lookthrough import PositionLookthrough
 
 logger = logging.getLogger(__name__)
@@ -21,8 +27,8 @@ class GateResult:
 class RiskGate:
     """Risk validation gates for portfolio decisions"""
     
-    # Risk limits
-    MAX_DAILY_VAR = 0.025  # 2.5% daily VaR
+    # Risk limits (all as positive values)
+    MAX_DAILY_VAR = 0.02  # 2.0% daily VaR (reduced from 2.5% per institutional standards)
     MAX_DRAWDOWN = 0.20    # 20% maximum drawdown
     MAX_SINGLE_COMPANY = 0.10  # 10% concentration limit for single companies (not funds)
     MIN_SHARPE = 0.3       # Minimum Sharpe ratio
@@ -34,21 +40,38 @@ class RiskGate:
         
         payload = risk_report.get("payload", {})
         failures = []
+        proof_fields = {}  # Track actual values for transparency
         
-        # Check VaR limit
-        var_95 = abs(payload.get("var_95", 0))
-        if var_95 > cls.MAX_DAILY_VAR:
-            failures.append(f"VaR exceeds limit: {var_95:.2%} > {cls.MAX_DAILY_VAR:.2%}")
+        # Standardize VaR check using RiskConventions
+        var_95_raw = payload.get("var_95", 0)
+        var_95 = abs(var_95_raw)  # Ensure positive value
+        
+        # Use RiskConventions for comparison
+        var_comparison = RiskConventions.compare_to_limit(var_95, cls.MAX_DAILY_VAR)
+        proof_fields["var_check"] = var_comparison
+        
+        if not var_comparison["passed"]:
+            failures.append(f"VaR {var_comparison['var_pct']:.2f}% exceeds {var_comparison['limit_pct']:.2f}% limit by {var_comparison['excess_pct']:.1f}%")
             
         # Check drawdown limit
         max_dd = abs(payload.get("max_drawdown", 0))
+        proof_fields["drawdown_check"] = {
+            "observed_value": max_dd,
+            "limit": cls.MAX_DRAWDOWN,
+            "passed": max_dd <= cls.MAX_DRAWDOWN
+        }
         if max_dd > cls.MAX_DRAWDOWN:
-            failures.append(f"Drawdown exceeds limit: {max_dd:.2%} > {cls.MAX_DRAWDOWN:.2%}")
+            failures.append(f"Drawdown {max_dd:.2%} exceeds {cls.MAX_DRAWDOWN:.2%} limit")
             
         # Check Sharpe ratio
         sharpe = payload.get("metrics", {}).get("sharpe", 0)
+        proof_fields["sharpe_check"] = {
+            "observed_value": sharpe,
+            "minimum": cls.MIN_SHARPE,
+            "passed": sharpe >= cls.MIN_SHARPE
+        }
         if sharpe < cls.MIN_SHARPE:
-            failures.append(f"Sharpe below minimum: {sharpe:.2f} < {cls.MIN_SHARPE:.2f}")
+            failures.append(f"Sharpe {sharpe:.2f} below minimum {cls.MIN_SHARPE:.2f}")
             
         # NEW: Use look-through analysis for concentration check
         positions = payload.get("positions", {})
@@ -83,6 +106,7 @@ class RiskGate:
                 details={
                     "failures": failures, 
                     "metrics": payload,
+                    "proof_fields": proof_fields,  # Include proof fields for transparency
                     "concentration_analysis": {
                         "max_company_exposure": concentration_result.max_concentration,
                         "max_company_symbol": concentration_result.max_concentration_symbol,
@@ -96,6 +120,7 @@ class RiskGate:
             reason="All risk checks passed",
             details={
                 "metrics": payload,
+                "proof_fields": proof_fields,  # Include proof fields for transparency
                 "concentration_analysis": {
                     "max_company_exposure": concentration_result.max_concentration,
                     "max_company_symbol": concentration_result.max_concentration_symbol,

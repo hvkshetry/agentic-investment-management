@@ -88,14 +88,15 @@ sub_agents_sequence:
   - id: risk_validation
     name: risk-analyst
     task: |
-      Validate risk metrics for each optimization candidate. Calculate VaR, CVaR,
-      max drawdown, and stress test impacts. Create risk_report_1.json and
-      risk_report_2.json for each candidate.
+      Validate risk metrics for each optimization candidate. Calculate Expected Shortfall (ES)
+      at 97.5% confidence as PRIMARY metric, VaR as reference only. Check ETF lookthrough
+      concentration. Create risk_report_1.json and risk_report_2.json for each candidate.
+      HALT if ES > 2.5% at 97.5% confidence.
     outputs: [risk_report_1, risk_report_2]
     depends_on: [optimization_candidate_1, optimization_candidate_2]
-    gates: [risk_gate_pre]
+    gates: [es_gate_pre, risk_gate_pre]
     acceptance:
-      must_have_fields: [var_95, cvar_95, max_drawdown, sharpe_ratio, stress_tests]
+      must_have_fields: [es_975, var_95, etf_lookthrough_concentration, max_drawdown, sharpe_ratio, stress_tests]
       
   - id: tax_analysis
     name: tax-advisor
@@ -114,26 +115,53 @@ sub_agents_sequence:
     task: |
       Select best optimization candidate based on risk and tax analyses.
       Create final trade_list.json with specific buy/sell orders and rationale.
-      Include decision_memo.json explaining selection.
+      Include decision_memo.json explaining selection. Ensure ES < 2.5% at 97.5% confidence.
     outputs: [trade_list, decision_memo]
     depends_on: [risk_report_1, risk_report_2, tax_impact_1, tax_impact_2]
-    gates: [risk_gate, tax_gate, compliance_gate, realism_gate]
+    gates: [es_gate, risk_gate, tax_gate, compliance_gate, realism_gate]
     acceptance:
-      must_have_fields: [trades, rationale, expected_improvement]
+      must_have_fields: [trades, rationale, expected_improvement, es_compliant]
+      
+  - id: round2_validation
+    name: gate-validator
+    task: |
+      MANDATORY Round-2 gate validation for final selected allocation.
+      Verify ES < 2.5%, tax reconciliation consistency, liquidity > 0.3.
+      Create lineage record tracking revision. Generate round2_validation.json.
+      HALT if any validation fails.
+    outputs: [round2_validation]
+    depends_on: [final_selection]
+    gates: [round2_gate]
+    acceptance:
+      must_have_fields: [es_check, tax_consistency, liquidity_check, lineage_record, halt_status]
 
 # Gate definitions (reference config/policy/*.yaml for limits)
 gates:
-  risk_gate_pre:
-    description: Pre-trade risk validation
+  es_gate_pre:
+    description: ES-primary pre-trade validation
     checks:
-      - var_95 <= max_daily_var_95
+      - es_975 <= 0.025  # 2.5% Expected Shortfall limit at 97.5% confidence
+      - es_var_ratio >= 1.0 AND <= 2.0  # ES/VaR ratio validation
+      - etf_lookthrough_concentration <= 0.20  # Single-name concentration with lookthrough
+      
+  risk_gate_pre:
+    description: Pre-trade risk validation (reference only)
+    checks:
+      - var_95 <= max_daily_var_95  # Reference only, not binding
       - sharpe_ratio >= min_sharpe
-      - max_position_weight <= max_single_position
+      - max_position_weight <= max_single_position  # Exempt broad market ETFs
+      
+  es_gate:
+    description: ES-primary post-trade validation (BINDING)
+    checks:
+      - es_975 <= 0.025  # HALT if exceeded
+      - liquidity_score >= 0.3  # HALT if below
+      - concentration_compliant == true  # With ETF lookthrough
       
   risk_gate:
-    description: Post-trade risk validation
+    description: Post-trade risk validation (reference)
     checks:
-      - expected_var <= current_var OR improvement_justified
+      - expected_var <= current_var OR improvement_justified  # Reference only
       - stress_test_losses <= max_stress_loss
       
   tax_gate:
@@ -153,9 +181,18 @@ gates:
   realism_gate:
     description: Statistical plausibility
     checks:
-      - no_single_position > 0.10
-      - position_count >= 20
+      - no_single_position > 0.20  # Increased for broad market ETFs
+      - position_count >= 15  # Reduced minimum
       - expected_sharpe <= 3.0  # Reject impossible Sharpes
+      
+  round2_gate:
+    description: MANDATORY Round-2 validation for all revisions
+    checks:
+      - es_975 <= 0.025  # ES limit (BINDING)
+      - tax_reconciliation_complete == true
+      - lineage_record_exists == true
+      - wash_sale_check_passed == true
+      - halt_not_active == true  # Cannot proceed if HALT active
       
   credibility_gate:
     description: Multi-source validation

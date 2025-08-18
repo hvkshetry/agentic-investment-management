@@ -63,9 +63,10 @@ class ArtifactStore:
         created_by: str,
         payload: Dict[str, Any],
         depends_on: List[str] = None,
-        confidence: float = 0.0
+        confidence: float = 0.0,
+        revision_info: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Create and store a new artifact"""
+        """Create and store a new artifact with optional revision tracking"""
         
         if not self.current_run_path:
             self.start_run()
@@ -80,6 +81,10 @@ class ArtifactStore:
             "confidence": confidence,
             "payload": payload
         }
+        
+        # Add revision info if this is a revision
+        if revision_info:
+            artifact["revision_info"] = revision_info
         
         # Store artifact
         artifact_path = self.current_run_path / f"{artifact['id']}.json"
@@ -129,6 +134,54 @@ class ArtifactStore:
         """Get the most recent artifact of a specific kind"""
         artifacts = self.get_artifacts_by_kind(kind)
         return artifacts[-1] if artifacts else None
+    
+    def create_revision(
+        self,
+        original_artifact_ids: List[str],
+        kind: ArtifactKind,
+        created_by: str,
+        payload: Dict[str, Any],
+        revision_reason: str,
+        revision_method: str = "manual",
+        confidence: float = 0.0
+    ) -> Dict[str, Any]:
+        """
+        Create a revision artifact that replaces one or more original artifacts
+        
+        Args:
+            original_artifact_ids: List of artifact IDs being replaced
+            kind: Type of the new artifact
+            created_by: Who created the revision
+            payload: New artifact payload
+            revision_reason: Why the revision was necessary
+            revision_method: How the revision was created (e.g., 'orchestrator_override', 'gate_remediation')
+            confidence: Confidence score for the revision
+            
+        Returns:
+            The new revision artifact
+        """
+        revision_info = {
+            "is_revision": True,
+            "replaces": original_artifact_ids,
+            "revision_reason": revision_reason,
+            "revision_method": revision_method,
+            "revision_timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Create the revision artifact
+        revision_artifact = self.create_artifact(
+            kind=kind,
+            created_by=created_by,
+            payload=payload,
+            depends_on=original_artifact_ids,  # Revision depends on originals
+            confidence=confidence,
+            revision_info=revision_info
+        )
+        
+        logger.info(f"Created revision artifact: {kind.value} replacing {len(original_artifact_ids)} artifacts")
+        logger.info(f"Revision reason: {revision_reason}")
+        
+        return revision_artifact
         
     def _save_index(self):
         """Save the current run index"""
