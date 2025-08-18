@@ -61,6 +61,30 @@ This system represents a paradigm shift from ad-hoc tool usage to **deterministi
 └─────────────────────────────────────────┘
 ```
 
+## Critical System Improvements (2025-08-18)
+
+### Expected Shortfall (ES) Primary Risk Management
+The system now uses **Expected Shortfall at 97.5% confidence** as the primary risk metric, replacing VaR-based decisions. ES provides superior tail risk measurement by showing the average loss beyond VaR threshold.
+
+- **ES Limit**: 2.5% (binding constraint)
+- **HALT Protocol**: Automatic trading stop if ES exceeds limit
+- **Round-2 Gate**: Mandatory validation for all portfolio revisions
+
+### Tax Reconciliation System
+Single-source-of-truth for all tax calculations with:
+- Recomputation on every portfolio revision
+- Immutable tax artifacts with checksums
+- FIFO lot selection and wash sale detection
+- Complete audit trail for IRS compliance
+
+### Key Components
+- `shared/risk_conventions.py`: Standardized risk calculations
+- `orchestrator/round2_gate.py`: Mandatory revision validation
+- `tax-mcp-server/tax_reconciliation.py`: Tax single-source-of-truth
+- `shared/optimization/cvxpy_optimizer.py`: Proper constraint handling
+
+See `documentation/COMPLETE_FIX_SUMMARY.md` for full details.
+
 ## Pre-Built Workflows
 
 ### 1. **Portfolio Rebalancing with Tax Loss Harvesting** (`rebalance_tlh.yaml`)
@@ -99,19 +123,28 @@ Import and validate portfolio data from broker CSV files.
 
 ## Policy Gates System
 
-### Automated Safeguards
-- **Risk Gate**: VaR limits, Sharpe minimums, stress test thresholds
-- **Tax Gate**: Wash sale prevention, loss harvesting rules
+### Automated Safeguards (ES-Primary)
+- **Risk Gate**: ES limits (2.5% at 97.5% confidence), VaR reference only
+- **Tax Gate**: Single-source-of-truth reconciliation, wash sale prevention
 - **Compliance Gate**: Regulatory requirements, account minimums
 - **Realism Gate**: Prevents impossible Sharpe ratios (>3.0)
 - **Credibility Gate**: Multi-source validation requirements
+- **Round-2 Gate**: MANDATORY validation for all portfolio revisions
+- **HALT Protocol**: Automatic trading stop if ES > 2.5% or critical failures
 
-### Example: Preventing GEV Pathology
+### Example: ES-Primary Risk Control
 ```yaml
 # config/policy/risk_limits.yaml
+risk_limits:
+  es_limit: 0.025           # 2.5% Expected Shortfall (BINDING)
+  es_alpha: 0.975           # 97.5% confidence level
+  var_limit: 0.020          # 2.0% VaR (reference only)
 position_limits:
-  max_single_position: 0.10  # 10% max prevents 25% GEV issue
-  min_positions: 20          # Ensures diversification
+  max_single_position: 0.15  # 15% max concentration
+  min_positions: 15          # Ensures diversification
+halt_triggers:
+  es_breach: true           # HALT if ES > 2.5%
+  liquidity_crisis: 0.3     # HALT if liquidity score < 0.3
 ```
 
 ## Creating Custom Workflows

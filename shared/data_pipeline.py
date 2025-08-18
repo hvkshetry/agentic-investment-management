@@ -643,6 +643,224 @@ class MarketDataPipeline:
             logger.error(f"Failed to fetch risk-free rate: {str(e)}")
             raise ValueError(f"Unable to fetch risk-free rate for {maturity}: {str(e)}")
     
+    def fetch_fama_french_factors(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        frequency: str = "daily"
+    ) -> Optional[pd.DataFrame]:
+        """
+        Fetch Fama-French 5-factors + momentum using OpenBB
+        NO SYNTHETIC DATA ALLOWED.
+        
+        Args:
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD)
+            frequency: Data frequency ('daily', 'monthly')
+            
+        Returns:
+            DataFrame with factors: MKT-RF, SMB, HML, RMW, CMA, MOM, RF
+            Returns None if data unavailable (NO SYNTHETIC FALLBACK)
+        """
+        # Check cache first
+        cache_key = f"ff_factors_{start_date}_{end_date}_{frequency}"
+        if cache_key in self.cache and self._is_cache_valid(self.cache[cache_key]):
+            logger.info(f"Using cached Fama-French factors")
+            return self.cache[cache_key]['data']
+        
+        try:
+            # Lazy load OpenBB if needed
+            if self.obb is not None:
+                logger.info(f"Fetching Fama-French factors from OpenBB for {start_date} to {end_date}")
+                
+                # Fetch 5-factor model using the correct API
+                # Map frequency to OpenBB format
+                freq_map = {
+                    'daily': 'daily',
+                    'weekly': 'weekly', 
+                    'monthly': 'monthly',
+                    'd': 'daily',
+                    'w': 'weekly',
+                    'm': 'monthly'
+                }
+                obb_frequency = freq_map.get(frequency.lower(), 'daily')
+                
+                # Note: OpenBB famafrench provider may have issues with certain date ranges
+                # For daily data, the provider may not have recent data
+                # We'll try to fetch and handle errors gracefully
+                try:
+                    ff5_data = self.obb.famafrench.factors(
+                        factor='5_factors',
+                        frequency=obb_frequency,
+                        provider='famafrench'
+                    )
+                except IndexError:
+                    # Try monthly data as fallback if daily fails
+                    if obb_frequency == 'daily':
+                        logger.warning("Daily Fama-French data unavailable, trying monthly")
+                        obb_frequency = 'monthly'
+                        ff5_data = self.obb.famafrench.factors(
+                            factor='5_factors',
+                            frequency='monthly',
+                            provider='famafrench'
+                        )
+                    else:
+                        raise
+                
+                # Convert to DataFrame
+                if hasattr(ff5_data, 'to_df'):
+                    try:
+                        ff5_df = ff5_data.to_df()
+                    except IndexError:
+                        # Handle empty results
+                        logger.warning("No data returned for 5-factor model in specified date range")
+                        return None
+                elif hasattr(ff5_data, 'results') and ff5_data.results:
+                    # Convert list of data objects to DataFrame
+                    data_dicts = []
+                    for item in ff5_data.results:
+                        if hasattr(item, '__dict__'):
+                            data_dicts.append(item.__dict__)
+                        else:
+                            data_dicts.append(item)
+                    ff5_df = pd.DataFrame(data_dicts)
+                    if 'date' in ff5_df.columns:
+                        ff5_df.set_index('date', inplace=True)
+                else:
+                    logger.warning("No 5-factor data available")
+                    return None
+                
+                # Fetch momentum factor separately
+                try:
+                    mom_data = self.obb.famafrench.factors(
+                        factor='momentum',
+                        frequency=obb_frequency,
+                        provider='famafrench'
+                    )
+                except (IndexError, Exception) as e:
+                    logger.warning(f"Could not fetch momentum factor: {e}")
+                    mom_data = None
+                
+                # Convert momentum to DataFrame
+                if mom_data and hasattr(mom_data, 'to_df'):
+                    try:
+                        mom_df = mom_data.to_df()
+                    except IndexError:
+                        # Handle empty results
+                        logger.warning("No momentum data returned")
+                        mom_df = pd.DataFrame()
+                elif mom_data and hasattr(mom_data, 'results') and mom_data.results:
+                    # Convert list of data objects to DataFrame
+                    data_dicts = []
+                    for item in mom_data.results:
+                        if hasattr(item, '__dict__'):
+                            data_dicts.append(item.__dict__)
+                        else:
+                            data_dicts.append(item)
+                    mom_df = pd.DataFrame(data_dicts)
+                    if 'date' in mom_df.columns:
+                        mom_df.set_index('date', inplace=True)
+                else:
+                    mom_df = pd.DataFrame()
+                
+                # Filter date range if needed
+                if start_date or end_date:
+                    # Convert string dates to datetime for filtering
+                    start_dt = pd.to_datetime(start_date).date() if start_date else None
+                    end_dt = pd.to_datetime(end_date).date() if end_date else None
+                    
+                    # Filter ff5_df
+                    if isinstance(ff5_df.index[0], pd.Timestamp):
+                        # Use pandas slicing for Timestamp index
+                        if start_date and end_date:
+                            ff5_df = ff5_df.loc[start_date:end_date]
+                        elif start_date:
+                            ff5_df = ff5_df.loc[start_date:]
+                        elif end_date:
+                            ff5_df = ff5_df.loc[:end_date]
+                    else:
+                        # Index is datetime.date objects - use boolean filtering
+                        mask = pd.Series([True] * len(ff5_df), index=ff5_df.index)
+                        if start_dt:
+                            mask = mask & (ff5_df.index >= start_dt)
+                        if end_dt:
+                            mask = mask & (ff5_df.index <= end_dt)
+                        ff5_df = ff5_df[mask]
+                    
+                    # Filter mom_df if not empty
+                    if not mom_df.empty:
+                        if isinstance(mom_df.index[0], pd.Timestamp):
+                            if start_date and end_date:
+                                mom_df = mom_df.loc[start_date:end_date]
+                            elif start_date:
+                                mom_df = mom_df.loc[start_date:]
+                            elif end_date:
+                                mom_df = mom_df.loc[:end_date]
+                        else:
+                            mask = pd.Series([True] * len(mom_df), index=mom_df.index)
+                            if start_dt:
+                                mask = mask & (mom_df.index >= start_dt)
+                            if end_dt:
+                                mask = mask & (mom_df.index <= end_dt)
+                            mom_df = mom_df[mask]
+                
+                # Combine factors
+                factors_df = ff5_df.copy()
+                
+                # Add momentum if available
+                if not mom_df.empty:
+                    if 'MOM' in mom_df.columns:
+                        factors_df['MOM'] = mom_df['MOM']
+                    elif 'WML' in mom_df.columns:  # Sometimes called Winners Minus Losers
+                        factors_df['MOM'] = mom_df['WML']
+                    elif 'mom' in mom_df.columns:
+                        factors_df['MOM'] = mom_df['mom']
+                    elif 'wml' in mom_df.columns:
+                        factors_df['MOM'] = mom_df['wml']
+                
+                # Standardize column names
+                column_map = {
+                    'Mkt-RF': 'MKT-RF',
+                    'mkt_rf': 'MKT-RF',
+                    'smb': 'SMB',
+                    'hml': 'HML',
+                    'rmw': 'RMW',
+                    'cma': 'CMA',
+                    'rf': 'RF',
+                    'mom': 'MOM',
+                    'wml': 'MOM'
+                }
+                
+                factors_df.rename(columns=column_map, inplace=True)
+                
+                # Convert from percentage to decimal if needed
+                factor_cols = ['MKT-RF', 'SMB', 'HML', 'RMW', 'CMA', 'MOM', 'RF']
+                for col in factor_cols:
+                    if col in factors_df.columns:
+                        # Check if values are in percentage (> 1 suggests percentage)
+                        if factors_df[col].abs().max() > 1:
+                            factors_df[col] = factors_df[col] / 100
+                
+                # Cache the result
+                self.cache[cache_key] = {
+                    'data': factors_df,
+                    'timestamp': datetime.now(timezone.utc)
+                }
+                
+                logger.info(f"Successfully fetched {len(factors_df)} days of Fama-French factors")
+                return factors_df
+                
+            else:
+                # NO SYNTHETIC DATA - fail explicitly
+                logger.error("OpenBB not available for fetching Fama-French factors")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error fetching Fama-French factors: {e}")
+            # NO SYNTHETIC FALLBACK - return None per user requirement
+            logger.error("Fama-French factors unavailable - factor analysis will be skipped")
+            return None
+    
     def fetch_market_index(self, index: str = 'SPY', lookback_days: int = 252) -> Dict[str, Any]:
         """
         Fetch market index data for benchmarking

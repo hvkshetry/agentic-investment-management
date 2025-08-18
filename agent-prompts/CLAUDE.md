@@ -38,30 +38,43 @@ You:
 7. Generate IC memo using ic-memo-generator agent
 ```
 
-## Gate Validation (NEW)
+## Gate Validation (ES-PRIMARY)
 
 ### Using Enhanced Gates
 The system now has configuration-driven gates:
-- **Risk Gate**: Reads from `config/policy/risk_limits.yaml`
-- **Tax Gate**: Reads from `config/policy/tax_limits.yaml`
+- **Risk Gate (ES-PRIMARY)**: ES must be < 2.5% at 97.5% confidence
+- **Tax Gate**: Single source of truth via Tax Reconciliation system
 - **Compliance Gate**: Reads from `config/policy/compliance_rules.yaml`
 - **Realism Gate**: Prevents pathological optimizations (25% GEV)
 - **Credibility Gate**: Requires multi-source validation
+- **Round-2 Gate**: MANDATORY validation for ALL portfolio revisions
 
-### Gate Application
+### HALT Protocol
+When ES > 2.5% or other critical failures:
+1. Create HALT_ORDER.json immediately
+2. Stop ALL trading activities
+3. Require corrective action before resuming
+4. Document in IC memo
+
+### Gate Application (with Round-2 Validation)
 After receiving artifacts from agents:
 1. Load artifact from session directory
 2. Apply relevant gate using `orchestrator/gates_enhanced.py`
-3. If gate fails: Request agent to revise or document override
-4. Track all gate results for IC memo
+3. **MANDATORY**: Apply Round-2 gate for any portfolio revision
+4. If ES > 2.5%: HALT immediately, no override allowed
+5. If other gates fail: Request agent to revise or document override
+6. Track all gate results and HALT orders for IC memo
 
 ## Guardrails (hard requirements)
 
+- **ES-PRIMARY**: Expected Shortfall at 97.5% confidence is the BINDING constraint (limit: 2.5%)
+- **HALT ENFORCEMENT**: Stop ALL trading if ES > 2.5%, liquidity < 0.3, or tax inconsistency
 - **No "AI slop"**: Every claim must be backed by tool output or documented model assumption
 - **Evidence-based**: Quote exact tool calls and parameters used
-- **Single source of truth**: The Portfolio State MCP Server is authoritative for holdings and tax lots
+- **Single source of truth**: Portfolio State MCP Server for holdings, Tax Reconciliation for tax
 - **Reproducibility**: Persist artifacts under `./runs/<timestamp>/`
 - **Atomic workflows**: Execute using explicit DAGs; fail loudly on missing inputs
+- **Round-2 Gate**: ALL revisions must pass mandatory validation
 
 ## Available Specialist Agents
 
@@ -196,19 +209,22 @@ mcp__portfolio-state-server__import_broker_csv(
 mcp__portfolio-state-server__get_portfolio_state()
 ```
 
-## VALIDATION GATES (MANDATORY)
+## VALIDATION GATES (ES-PRIMARY MANDATORY)
 
 Before accepting ANY agent output:
-1. **Tax Loss Validation**: Verify all loss numbers match `portfolio_state` unrealized_gain EXACTLY
-2. **Ticker Validation**: Verify all recommended tickers exist in current holdings
-3. **Asset Classification**: Verify classifications match data provider info
-4. **Template Detection**: REJECT any report with template values (75000, 125000, round numbers)
-5. **Tax Rate Validation**: All rates must come from tenforty library, not hardcoded
-6. **Options Income**: Must be <10% annualized yield based on actual chain data
-7. **Tool Names**: Ensure agents use CORRECT MCP tool names
-8. **Parameter Types**: Numeric parameters must be native types not strings
-9. **Risk Analysis**: Must have using_portfolio_state=true and cover ALL positions
-10. **No Fabrication**: REJECT ANY metrics not in actual tool outputs
+1. **ES LIMIT CHECK**: ES must be < 2.5% at 97.5% confidence or HALT
+2. **Round-2 Gate**: ALL revisions must pass mandatory validation
+3. **Tax Reconciliation**: Verify positions match allocation exactly
+4. **Tax Loss Validation**: Verify all loss numbers match `portfolio_state` unrealized_gain EXACTLY
+5. **Ticker Validation**: Verify all recommended tickers exist in current holdings
+6. **Asset Classification**: Verify classifications match data provider info
+7. **Template Detection**: REJECT any report with template values (75000, 125000, round numbers)
+8. **Tax Rate Validation**: All rates must come from tenforty library, not hardcoded
+9. **Options Income**: Must be <10% annualized yield based on actual chain data
+10. **Tool Names**: Ensure agents use CORRECT MCP tool names
+11. **Parameter Types**: Numeric parameters must be native types not strings
+12. **Risk Analysis**: Must have using_portfolio_state=true and cover ALL positions
+13. **No Fabrication**: REJECT ANY metrics not in actual tool outputs
 
 ## Final Mandate
 
