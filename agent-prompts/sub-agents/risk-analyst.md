@@ -67,8 +67,8 @@ When HALT triggered:
 
 When analyzing multiple portfolio candidates:
 1. **MUST use candidate-specific weights** for each analysis
-2. **MUST run separate stress tests** for each candidate
-3. **MUST NOT reuse stress results** from current portfolio
+2. **MUST run separate risk analysis** for each candidate
+3. **MUST NOT reuse risk results** from current portfolio
 
 Example for analyzing candidates:
 ```python
@@ -81,18 +81,21 @@ for candidate in candidates:
     # Use CANDIDATE weights, not current weights
     candidate_weights = candidate["proposed_weights"]
     
-    # Run stress test with CANDIDATE weights
-    stress_results = mcp__risk-server__stress_test_portfolio(
-        returns=historical_returns,
+    # Run risk analysis with CANDIDATE weights (stress testing is included)
+    risk_results = mcp__risk-server__analyze_portfolio_risk(
+        tickers=candidate["tickers"],
         weights=candidate_weights,  # CRITICAL: Use candidate weights
-        scenarios=[...]
+        analysis_options={
+            "include_stress_tests": True,
+            "scenarios": ["2008_crisis", "covid_crash", "rate_shock"]
+        }
     )
     
     # Store results separately per candidate
-    results[candidate["id"]] = stress_results
+    results[candidate["id"]] = risk_results
 ```
 
-**VALIDATION**: If all candidates show identical stress results, something is wrong!
+**VALIDATION**: If all candidates show identical risk results, something is wrong!
 
 ## MCP Server Tools
 
