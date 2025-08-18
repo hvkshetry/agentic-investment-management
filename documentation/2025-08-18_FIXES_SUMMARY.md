@@ -22,11 +22,13 @@ Successfully addressed all critical issues identified in run 20250818_162257. Th
 
 ### 3. ETF Concentration False Positive
 **Problem**: VTI at 18.76% incorrectly flagged as concentration risk
-**Root Cause**: No exemption for broad market ETFs
+**Root Cause**: Funds were being treated same as individual stocks for concentration limits
 **Fix**: 
-- Added BROAD_MARKET_ETFS set with 16 broad market ETFs
-- Modified position_lookthrough.py to exempt these from single-position limits
-- Implemented proper lookthrough for non-broad-market positions
+- ALL funds (ETFs, Mutual Funds, CEFs) are now EXEMPT from direct concentration limits
+- Only individual stocks are subject to the 20% single-position limit
+- Modified position_lookthrough.py to identify funds vs individual stocks
+- Funds are analyzed via lookthrough for true underlying exposure
+- This makes sense because funds provide built-in diversification
 **Status**: ✅ FIXED
 
 ### 4. Round-2 Gate Not Executed

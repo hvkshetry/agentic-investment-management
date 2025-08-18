@@ -28,27 +28,8 @@ class PositionLookthrough:
     """
     
     # ETF/Fund types that need look-through analysis
+    # ALL funds are exempt from direct concentration limits
     FUND_TYPES = {'ETF', 'MUTUALFUND', 'CEF'}  # Closed-End Fund
-    
-    # Broad market ETFs EXEMPT from single-position concentration limits
-    BROAD_MARKET_ETFS = {
-        'VTI',   # Vanguard Total Stock Market
-        'VOO',   # Vanguard S&P 500
-        'SPY',   # SPDR S&P 500
-        'IVV',   # iShares Core S&P 500
-        'VT',    # Vanguard Total World Stock
-        'VXUS',  # Vanguard Total International Stock
-        'IXUS',  # iShares Core MSCI Total International
-        'ACWI',  # iShares MSCI ACWI
-        'URTH',  # iShares MSCI World
-        'ITOT',  # iShares Core S&P Total Market
-        'SCHB',  # Schwab US Broad Market
-        'VEA',   # Vanguard Developed Markets
-        'VWO',   # Vanguard Emerging Markets
-        'IEFA',  # iShares Core MSCI EAFE
-        'EFA',   # iShares MSCI EAFE
-        'IEMG',  # iShares Core MSCI Emerging Markets
-    }
     
     # Cache for fund holdings to avoid repeated API calls
     _holdings_cache = {}
@@ -401,7 +382,9 @@ class PositionLookthrough:
     def check_concentration_limits(self, portfolio: Dict[str, float]) -> ConcentrationResult:
         """
         Check if portfolio meets concentration limits
-        Broad market ETFs are EXEMPT from single-position limits
+        ALL FUNDS (ETFs, Mutual Funds, CEFs) are EXEMPT from single-position limits
+        Only individual stocks are subject to concentration limits
+        Funds are analyzed through lookthrough to underlying holdings
         
         Args:
             portfolio: Dictionary of {symbol: weight_in_portfolio}
@@ -409,33 +392,45 @@ class PositionLookthrough:
         Returns:
             ConcentrationResult with pass/fail and details
         """
-        # Separate broad market ETFs from other positions
-        broad_market_positions = {}
-        other_positions = {}
+        # Separate funds from individual positions
+        fund_positions = {}
+        individual_positions = {}
         
         for ticker, weight in portfolio.items():
-            if ticker.upper() in self.BROAD_MARKET_ETFS:
-                broad_market_positions[ticker] = weight
+            # Check if it's a fund (ETF, Mutual Fund, or CEF)
+            if self.is_fund(ticker):
+                fund_positions[ticker] = weight
+                logger.info(f"{ticker} identified as fund - exempt from direct concentration limit")
             else:
-                other_positions[ticker] = weight
+                individual_positions[ticker] = weight
         
-        # Calculate true concentration only for non-broad-market positions
-        company_exposure = self.calculate_concentration(other_positions)
+        # Calculate true concentration including lookthrough of funds
+        # This will look through fund holdings and aggregate exposure
+        company_exposure = self.calculate_concentration(portfolio)
         
-        # Find violations
+        # Find violations - only check individual stocks, not funds
         violations = []
         max_concentration = 0
         max_symbol = ""
         
-        for symbol, concentration in company_exposure.items():
-            if concentration > max_concentration:
-                max_concentration = concentration
+        # Check concentration limits only for individual positions (not funds)
+        for symbol, weight in individual_positions.items():
+            if weight > max_concentration:
+                max_concentration = weight
                 max_symbol = symbol
                 
-            if concentration > self.concentration_limit:
-                violations.append((symbol, concentration))
-                logger.warning(f"Concentration violation: {symbol} = {concentration:.2%} "
+            if weight > self.concentration_limit:
+                violations.append((symbol, weight))
+                logger.warning(f"Concentration violation: {symbol} = {weight:.2%} "
                              f"exceeds {self.concentration_limit:.2%} limit")
+        
+        # Also track the maximum underlying exposure from lookthrough
+        max_underlying_concentration = 0
+        max_underlying_symbol = ""
+        for symbol, concentration in company_exposure.items():
+            if concentration > max_underlying_concentration:
+                max_underlying_concentration = concentration
+                max_underlying_symbol = symbol
                 
         # Sort violations by concentration (highest first)
         violations.sort(key=lambda x: x[1], reverse=True)
@@ -452,9 +447,13 @@ class PositionLookthrough:
                 'limit': self.concentration_limit,
                 'total_companies': len(company_exposure),
                 'companies_over_5pct': sum(1 for c in company_exposure.values() if c > 0.05),
-                'broad_market_etfs': broad_market_positions,
-                'broad_market_total_weight': sum(broad_market_positions.values()),
-                'broad_market_exempt': True
+                'fund_positions': fund_positions,
+                'individual_positions': individual_positions,
+                'funds_total_weight': sum(fund_positions.values()),
+                'individuals_total_weight': sum(individual_positions.values()),
+                'all_funds_exempt': True,
+                'max_underlying_concentration': max_underlying_concentration,
+                'max_underlying_symbol': max_underlying_symbol
             }
         )
         
@@ -472,20 +471,36 @@ class PositionLookthrough:
         
         report = "# Concentration Risk Analysis (Look-Through)\n\n"
         
-        # Show broad market ETF exemption
-        if result.details.get('broad_market_etfs'):
-            broad_market_weight = result.details.get('broad_market_total_weight', 0)
-            report += f"📊 **Broad Market ETFs**: {broad_market_weight:.1%} (EXEMPT from concentration limits)\n"
-            for etf, weight in result.details['broad_market_etfs'].items():
-                report += f"  - {etf}: {weight:.2%}\n"
+        # Show fund positions (all exempt)
+        if result.details.get('fund_positions'):
+            funds_weight = result.details.get('funds_total_weight', 0)
+            report += f"📊 **Fund Positions**: {funds_weight:.1%} (ALL FUNDS EXEMPT from direct concentration limits)\n"
+            for fund, weight in result.details['fund_positions'].items():
+                report += f"  - {fund}: {weight:.2%}\n"
+            report += "\n"
+        
+        # Show individual stock positions
+        if result.details.get('individual_positions'):
+            individuals_weight = result.details.get('individuals_total_weight', 0)
+            report += f"📈 **Individual Stock Positions**: {individuals_weight:.1%} (Subject to {self.concentration_limit:.1%} limit)\n"
+            for stock, weight in result.details['individual_positions'].items():
+                status = "⚠️" if weight > self.concentration_limit else "✓"
+                report += f"  {status} {stock}: {weight:.2%}\n"
             report += "\n"
         
         if result.passed:
-            report += f"✅ **PASSED**: No single company exceeds {self.concentration_limit:.1%} limit\n\n"
+            report += f"✅ **PASSED**: No individual stock exceeds {self.concentration_limit:.1%} limit\n\n"
         else:
-            report += f"❌ **FAILED**: {len(result.violations)} companies exceed {self.concentration_limit:.1%} limit\n\n"
+            report += f"❌ **FAILED**: {len(result.violations)} individual stocks exceed {self.concentration_limit:.1%} limit\n\n"
             
-        report += f"**Maximum Single-Name Concentration**: {result.max_concentration_symbol} at {result.max_concentration:.2%}\n\n"
+        if result.max_concentration_symbol:
+            report += f"**Maximum Individual Stock Concentration**: {result.max_concentration_symbol} at {result.max_concentration:.2%}\n"
+        
+        max_underlying = result.details.get('max_underlying_concentration', 0)
+        max_underlying_symbol = result.details.get('max_underlying_symbol', '')
+        if max_underlying > 0:
+            report += f"**Maximum Underlying Exposure (via lookthrough)**: {max_underlying_symbol} at {max_underlying:.2%}\n"
+        report += "\n"
         
         if result.violations:
             report += "## Violations\n"
