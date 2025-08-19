@@ -5,7 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2025-08-18
+## [2.1.0] - 2025-01-18
+
+### Added
+- **Tool-First Data Policy**: Mandatory provenance tracking for all metrics with tool_calls[] arrays
+- **Pricing Enrichment Module**: Automatic enrichment of portfolio state with current market prices
+- **Artifact Validation Framework**: Schema-based validation with business rule enforcement
+- **Comprehensive Test Suite**: Integration tests validating all critical fixes
+- **Global Policy Header**: Standardized GLOBAL_HEADER.md for all agent prompts
+- **JSON Artifact Schemas**: Formal schema definitions with provenance requirements
+
+### Changed
+- **Concentration Risk Policy**: ALL funds (ETFs, Mutual Funds, CEFs) now exempt from concentration limits
+- **Agent Prompts**: Updated all critical agents to enforce tool-first data policy
+- **Tax Year Support**: Extended validation to include year 2025
+- **Risk Reporting**: Updated to show ES as primary metric with VaR as reference only
+
+### Fixed
+- Tax MCP server now accepts year 2025 (was rejecting as invalid)
+- Tax optimization server stdout pollution causing JSON parsing errors
+- Portfolio state tax lots missing current_price and current_value fields
+- Agent prompts incorrectly referencing simple_max_position instead of concentration_analysis
+- Concentration risk incorrectly flagging funds as violations
+- Round-2 gate not properly checking ES limits
+
+### Security
+- Enforced tool-first policy prevents data fabrication
+- Mandatory provenance tracking provides complete audit trail
+- Automatic HALT on estimated data or missing tool calls
+
+## [2.0.0] - 2025-01-17
 
 ### Added
 - **Expected Shortfall (ES) Primary Risk Management**: ES at 97.5% confidence is now the binding risk constraint

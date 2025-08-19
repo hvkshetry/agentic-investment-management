@@ -67,6 +67,8 @@ class TaxLotModel(BaseModel):
     purchase_date: str = Field(..., pattern=r'^\d{4}-\d{2}-\d{2}$', description="Purchase date (YYYY-MM-DD)")
     purchase_price: float = Field(..., gt=0, description="Price per share at purchase")
     cost_basis: float = Field(..., gt=0, description="Total cost basis for this lot")
+    current_price: Optional[float] = Field(default=None, description="Current market price per share")
+    current_value: Optional[float] = Field(default=None, description="Current market value of this lot")
     holding_period_days: int = Field(default=0, ge=0, description="Days held")
     is_long_term: bool = Field(default=False, description="Whether holding qualifies for long-term capital gains")
     asset_type: AssetType = Field(default=AssetType.EQUITY, description="Type of asset")

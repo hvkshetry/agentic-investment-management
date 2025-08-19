@@ -29,7 +29,7 @@ try:
     ORACLE_AVAILABLE = True
 except ImportError as e:
     ORACLE_AVAILABLE = False
-    print(f"Oracle import error: {e}")
+    logger.error(f"Oracle import error: {e}")
 
 # Import confidence scoring and shared services
 from confidence_scoring import ConfidenceScorer

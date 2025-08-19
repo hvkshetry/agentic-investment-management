@@ -106,9 +106,10 @@ Write `validation_report.json` to session directory:
         "risk_gate": {
           "passed": true,
           "checks": {
-            "var_limit": "PASS: 1.4% < 2.0%",
+            "es_limit": "PASS: ES 2.3% < 2.5% (PRIMARY)",
+            "var_limit": "PASS: 1.4% < 2.0% (reference only)",
             "sharpe_minimum": "PASS: 0.93 > 0.85",
-            "concentration": "PASS: Max position 8.5% < 10%"
+            "concentration": "PASS: Max individual stock 8.5% < 20%, funds exempt"
           }
         },
         "realism_gate": {

@@ -149,6 +149,8 @@ class TaxLot:
     purchase_date: str
     purchase_price: float
     cost_basis: float
+    current_price: Optional[float] = None
+    current_value: Optional[float] = None
     holding_period_days: int = 0
     is_long_term: bool = False
     asset_type: str = AssetType.EQUITY
@@ -520,9 +522,12 @@ class PortfolioStateManager:
             if not lots:
                 continue
             
-            # Update holding periods for all lots
+            # Update holding periods and current prices for all lots
             for lot in lots:
                 lot.update_holding_period()
+                # Add current price and value to each lot
+                lot.current_price = current_prices.get(symbol, lot.purchase_price)
+                lot.current_value = lot.quantity * lot.current_price
             
             total_quantity = sum(lot.quantity for lot in lots)
             total_cost_basis = sum(lot.cost_basis for lot in lots)

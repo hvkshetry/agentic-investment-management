@@ -61,7 +61,7 @@ This system represents a paradigm shift from ad-hoc tool usage to **deterministi
 └─────────────────────────────────────────┘
 ```
 
-## Critical System Improvements (2025-08-18)
+## Critical System Improvements (2025-01-18)
 
 ### Expected Shortfall (ES) Primary Risk Management
 The system now uses **Expected Shortfall at 97.5% confidence** as the primary risk metric, replacing VaR-based decisions. ES provides superior tail risk measurement by showing the average loss beyond VaR threshold.
@@ -70,12 +70,27 @@ The system now uses **Expected Shortfall at 97.5% confidence** as the primary ri
 - **HALT Protocol**: Automatic trading stop if ES exceeds limit
 - **Round-2 Gate**: Mandatory validation for all portfolio revisions
 
+### Tool-First Data Policy
+Strict enforcement of data integrity with mandatory provenance tracking:
+- ALL metrics must come from MCP tool calls
+- No estimation or fabrication allowed
+- Every data point includes source and timestamp
+- Missing data explicitly noted with "needs" entries
+
+### Concentration Risk Management
+Improved concentration limit implementation:
+- ALL funds (ETFs, Mutual Funds, CEFs) are EXEMPT from limits
+- Only individual stocks subject to 20% position limit
+- Lookthrough analysis for true underlying exposure
+- Automatic HALT if concentration breach detected
+
 ### Tax Reconciliation System
 Single-source-of-truth for all tax calculations with:
 - Recomputation on every portfolio revision
 - Immutable tax artifacts with checksums
 - FIFO lot selection and wash sale detection
 - Complete audit trail for IRS compliance
+- Tax year 2025 support added
 
 ### Key Components
 - `shared/risk_conventions.py`: Standardized risk calculations

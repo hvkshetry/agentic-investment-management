@@ -52,7 +52,7 @@ async def calculate_comprehensive_tax(
     Single tool that handles all tax scenarios per reviewer feedback.
     
     Args:
-        tax_year: Tax year (2018-2024)
+        tax_year: Tax year (2018-2025)
         entity_type: 'individual', 'trust', or 'estate'
         filing_status: For individuals: 'Single', 'Married Filing Jointly', etc.
         state: Two-letter state code (e.g., 'MA', 'CA', 'NY') or empty string for no state tax
