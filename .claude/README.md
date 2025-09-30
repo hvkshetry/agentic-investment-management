@@ -4,7 +4,7 @@ This directory contains Claude Code CLI configuration files.
 
 ## Files
 
-### `CLAUDE.md`
+### `CLAUDE.md` → Moved to `/CLAUDE.md` (repository root)
 Main orchestrator prompt for **Obsidian-based workflows**.
 
 **Use case**: Interactive portfolio management with knowledge graph
@@ -13,6 +13,7 @@ Main orchestrator prompt for **Obsidian-based workflows**.
 - Smart Connections for semantic linking
 - Template-based position tracking
 
+**Location**: Now at `/CLAUDE.md` in repository root for easier access
 **Invoke**: This is loaded automatically when using Claude Code with this directory
 
 ### `agents/`

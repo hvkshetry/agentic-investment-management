@@ -68,6 +68,28 @@ news_company(
 # Returns up to 50 recent articles (auto-limited to prevent token overflow)
 ```
 
+**mcp_news_search** (General market/topic news via GDELT):
+```python
+# ⚠️ CRITICAL: GDELT rejects queries with keywords < 3 characters
+# ❌ WRONG: query="AI wastewater" (AI is too short)
+# ✅ CORRECT: query="artificial intelligence wastewater treatment"
+
+mcp__openbb-curated__mcp_news_search(
+    query="artificial intelligence water treatment",  # Use full terms, not abbreviations
+    limit=10,
+    source_country="us"  # Optional: filter by country
+)
+
+# Common replacements for short terms:
+# AI → artificial intelligence
+# ML → machine learning
+# IoT → internet of things
+# API → application programming interface
+
+# If you see error: "GDELT error: gdelt unexpected error: Expecting value: line 1 column 1"
+# → This means GDELT rejected the query. Rewrite with longer keywords.
+```
+
 - `regulators_sec_rss_litigation`: SEC enforcement and litigation news
 - `equity_fundamental_filings`: Recent SEC filings for specific tickers
 - WebSearch: Fallback for broader market news
