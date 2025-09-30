@@ -213,6 +213,26 @@ Task(
 5. **All agents write to SAME session folder**
 6. **Let Smart Connections handle linking**
 
+## Tool Usage Guidelines
+
+### News Search (GDELT-based)
+**CRITICAL**: GDELT rejects queries with keywords shorter than 3 characters.
+
+**❌ DON'T use short abbreviations:**
+- "AI" → Use "artificial intelligence"
+- "ML" → Use "machine learning"
+- "IoT" → Use "internet of things"
+- "API" → Use "application programming interface"
+
+**✅ DO use full terms:**
+- "artificial intelligence wastewater engineering"
+- "machine learning water treatment optimization"
+- "digital twin industrial water systems"
+
+**Exceptions**: Geographic codes are OK (US, UK, EU, UN)
+
+**Error Pattern**: If you see `"error": "GDELT error: gdelt unexpected error: Expecting value: line 1 column 1 (char 0)"`, this usually means GDELT rejected the query due to short keywords. Reformulate with longer terms.
+
 ## Session Structure
 ```
 /Investing/Context/Sessions/20250823_150000/
