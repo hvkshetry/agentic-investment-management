@@ -56,6 +56,58 @@ def _extract_brief_description(full_description: str) -> str:
     return brief.strip() or "No description available"
 
 
+def _register_zero_cost_tools(mcp: FastMCPOpenAPI) -> None:
+    """Register zero-cost custom MCP tools."""
+    # Import all tool modules
+    from .freequotes_tools import mcp_marketdata_quote, mcp_marketdata_quote_batch
+    from .freefx_tools import mcp_fx_quote, mcp_fx_convert, mcp_fx_historical
+    from .macro_tools import mcp_economy_wb_indicator, mcp_economy_imf_series
+    from .news_tools import mcp_news_search, mcp_news_search_company
+    from .screener_tools import mcp_equity_screener
+    from .analyst_tools import (
+        mcp_analyst_price_target,
+        mcp_analyst_recommendations,
+        mcp_analyst_estimates,
+    )
+    from .chart_tools import mcp_chart_line, mcp_chart_bar
+    from .commodities_tools import mcp_commodity_gold, mcp_commodity_silver
+
+    # Real-time Quotes
+    mcp.tool(tags={"marketdata"})(mcp_marketdata_quote)
+    mcp.tool(tags={"marketdata"})(mcp_marketdata_quote_batch)
+
+    # FX & Currency
+    mcp.tool(tags={"fx"})(mcp_fx_quote)
+    mcp.tool(tags={"fx"})(mcp_fx_convert)
+    mcp.tool(tags={"fx"})(mcp_fx_historical)
+
+    # Global Macro
+    mcp.tool(tags={"economy"})(mcp_economy_wb_indicator)
+    mcp.tool(tags={"economy"})(mcp_economy_imf_series)
+
+    # News & Sentiment
+    mcp.tool(tags={"news"})(mcp_news_search)
+    mcp.tool(tags={"news"})(mcp_news_search_company)
+
+    # Screener
+    mcp.tool(tags={"equity"})(mcp_equity_screener)
+
+    # Analyst Coverage
+    mcp.tool(tags={"analyst"})(mcp_analyst_price_target)
+    mcp.tool(tags={"analyst"})(mcp_analyst_recommendations)
+    mcp.tool(tags={"analyst"})(mcp_analyst_estimates)
+
+    # Charting
+    mcp.tool(tags={"chart"})(mcp_chart_line)
+    mcp.tool(tags={"chart"})(mcp_chart_bar)
+
+    # Commodities
+    mcp.tool(tags={"commodity"})(mcp_commodity_gold)
+    mcp.tool(tags={"commodity"})(mcp_commodity_silver)
+
+    logger.info("✓ Registered 17 zero-cost custom MCP tools")
+
+
 def create_mcp_server(settings: MCPSettings, fastapi_app: FastAPI) -> FastMCPOpenAPI:
     """Create and configure the MCP server."""
     tool_registry = ToolRegistry()
@@ -127,6 +179,9 @@ def create_mcp_server(settings: MCPSettings, fastapi_app: FastAPI) -> FastMCPOpe
         name=settings.name,
         route_maps=create_route_maps_from_settings(settings),
     )
+
+    # Register zero-cost custom tools
+    _register_zero_cost_tools(mcp)
 
     # Tool discovery is permanently disabled for curated mode
     # The following code is kept but will never execute

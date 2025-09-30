@@ -1,0 +1,78 @@
+{
+  "mcpServers": {
+    "openbb-curated": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/openbb-mcp",
+      "args": [
+        "--transport",
+        "stdio",
+        "--no-tool-discovery"
+      ],
+      "env": {
+        "MCP_TIMEOUT": "60000"
+      }
+    },
+    "portfolio-state-server": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/python",
+      "args": [
+        "/path/to/investing/portfolio-state-mcp-server/portfolio_state_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/investing:/path/to/investing/shared"
+      }
+    },
+    "portfolio-optimization-server": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/python",
+      "args": [
+        "/path/to/investing/portfolio-mcp-server/portfolio_mcp_server_v3.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/investing:/path/to/investing/shared"
+      }
+    },
+    "risk-server": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/python",
+      "args": [
+        "/path/to/investing/risk-mcp-server/risk_mcp_server_v3.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/investing:/path/to/investing/shared"
+      }
+    },
+    "tax-server": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/python",
+      "args": [
+        "/path/to/investing/tax-mcp-server/tax_mcp_server_v2.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/investing:/path/to/investing/shared"
+      }
+    },
+    "tax-optimization-server": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/python",
+      "args": [
+        "/path/to/investing/tax-optimization-mcp-server/tax_optimization_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/investing:/path/to/investing/shared:/path/to/investing/oracle/src"
+      }
+    },
+    "policy-events-service": {
+      "type": "stdio",
+      "command": "/path/to/your/venv/bin/python",
+      "args": [
+        "/path/to/investing/policy-events-mcp-server/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/investing:/path/to/investing/shared",
+        "CONGRESS_API_KEY": "your_congress_api_key_here",
+        "GOVINFO_API_KEY": "your_govinfo_api_key_here"
+      }
+    }
+  }
+}

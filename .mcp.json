@@ -1,0 +1,74 @@
+{
+  "mcpServers": {
+    "openbb-curated": {
+      "type": "stdio",
+      "command": "/home/hvksh/investing/.venv/bin/python",
+      "args": [
+        "/home/hvksh/investing/openbb-mcp-customizations/openbb_mcp_server/main.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/hvksh/investing:/home/hvksh/investing/openbb-mcp-customizations"
+      }
+    },
+    "portfolio-state-server": {
+      "type": "stdio",
+      "command": "/home/hvksh/investing/.venv/bin/python",
+      "args": [
+        "/home/hvksh/investing/portfolio-state-mcp-server/portfolio_state_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/hvksh/investing:/home/hvksh/investing/shared"
+      }
+    },
+    "portfolio-optimization-server": {
+      "type": "stdio",
+      "command": "/home/hvksh/investing/.venv/bin/python",
+      "args": [
+        "/home/hvksh/investing/portfolio-mcp-server/portfolio_mcp_server_v3.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/hvksh/investing:/home/hvksh/investing/shared"
+      }
+    },
+    "risk-server": {
+      "type": "stdio",
+      "command": "/home/hvksh/investing/.venv/bin/python",
+      "args": [
+        "/home/hvksh/investing/risk-mcp-server/risk_mcp_server_v3.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/hvksh/investing:/home/hvksh/investing/shared"
+      }
+    },
+    "tax-server": {
+      "type": "stdio",
+      "command": "/home/hvksh/investing/.venv/bin/python",
+      "args": [
+        "/home/hvksh/investing/tax-mcp-server/tax_mcp_server_v2.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/hvksh/investing:/home/hvksh/investing/shared"
+      }
+    },
+    "tax-optimization-server": {
+      "type": "stdio",
+      "command": "/home/hvksh/investing/.venv/bin/python",
+      "args": [
+        "/home/hvksh/investing/tax-optimization-mcp-server/tax_optimization_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/hvksh/investing:/home/hvksh/investing/shared:/home/hvksh/investing/oracle/src"
+      }
+    },
+    "policy-events-service": {
+      "type": "stdio",
+      "command": "/home/hvksh/investing/.venv/bin/python",
+      "args": [
+        "/home/hvksh/investing/policy-events-mcp-server/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/hvksh/investing:/home/hvksh/investing/shared"
+      }
+    }
+  }
+}

@@ -37,8 +37,8 @@ class SharedCacheManager:
         self.cache: Dict[str, Tuple[Any, datetime]] = {}
         self.lock = threading.RLock()
         
-        # Cache file for persistence
-        self.cache_file = Path("/home/hvksh/investing/shared/cache/market_data_cache.json")
+        # Cache file for persistence - use relative path from this module
+        self.cache_file = Path(__file__).parent / "cache" / "market_data_cache.json"
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
         
         # Statistics for monitoring

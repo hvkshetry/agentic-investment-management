@@ -56,7 +56,7 @@ This system represents a paradigm shift from ad-hoc tool usage to **deterministi
 │  • portfolio-optimization-v3            │
 │  • tax-server-v2                        │
 │  • tax-optimization-oracle              │
-│  • openbb-curated (44 tools)           │
+│  • openbb-curated (17 zero-cost tools) │
 │  • policy-events-service                │
 └─────────────────────────────────────────┘
 ```
@@ -214,6 +214,8 @@ triggers:
 3. **WSL/Linux** (recommended) or macOS
 4. **Portfolio CSV files** in supported format
 
+**Note**: This project runs entirely in Linux (WSL or native). If you have a Windows directory at `C:\Users\[username]\investing`, it's deprecated - see consolidation notes below.
+
 ### Installation
 
 1. Clone the repository:
@@ -229,24 +231,42 @@ source openbb/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Configure MCP servers in `~/.claude/settings.json`:
+3. Configure API keys (copy template and add your keys):
+```bash
+cp .env.example .env
+# Edit .env and add your API keys
+```
+
+**Zero-Cost Setup**: The system works with free-tier API keys:
+- **Required**: None (Yahoo Finance works without keys)
+- **Recommended**: Alpha Vantage (free tier: 5 calls/min)
+- **Optional**: Finnhub, FMP for analyst coverage
+
+See `documentation/ZERO_COST_DEPLOYMENT_CHECKLIST.md` for full setup guide.
+
+4. Configure MCP servers by copying the template:
+```bash
+cp .mcp.json ~/.claude/mcp_servers.json
+# Edit paths if needed (should work as-is for standard installation)
+```
+
+Alternatively, manually configure in `~/.claude/settings.json`:
 ```json
 {
   "mcpServers": {
     "portfolio-state-server": {
-      "command": "python",
-      "args": ["[path]/portfolio-state-mcp-server/state_server.py"]
-    },
-    "risk-server-v3": {
-      "command": "python",
-      "args": ["[path]/risk-mcp-server-v3/risk_server.py"]
+      "command": "/home/[user]/investing/.venv/bin/python",
+      "args": ["/home/[user]/investing/portfolio-state-mcp-server/portfolio_state_server.py"],
+      "env": {
+        "PYTHONPATH": "/home/[user]/investing:/home/[user]/investing/shared"
+      }
     }
-    // ... other servers
+    // ... see .mcp.json for all 7 servers
   }
 }
 ```
 
-4. Place portfolio CSVs in designated directory:
+5. Place portfolio CSVs in designated directory:
 ```
 /path/to/portfolio/
 ├── vanguard.csv
@@ -328,11 +348,26 @@ your_gate:
 
 ## Security & Compliance
 
-- **No hardcoded credentials**: All sensitive data in environment variables
+### Data Protection
+- **No hardcoded credentials**: All sensitive data in `.env` (gitignored)
+- **API key management**: Template-based setup via `.env.example`
+- **Sensitive file exclusion**: Portfolio CSVs, state files, cache excluded from git
 - **Audit trail**: Complete session history for compliance
-- **Policy enforcement**: Automated gates prevent violations
 - **Data isolation**: Each session has isolated artifacts
+
+### Risk Controls
+- **Policy enforcement**: Automated gates prevent violations
+- **HALT protocol**: Automatic trading stop on ES breach (>2.5%)
 - **Read-only market data**: No execution without explicit approval
+- **Round-2 validation**: MANDATORY for all portfolio revisions
+- **Tool-first data policy**: No estimation or fabrication allowed
+
+### Deployment
+Before public deployment, run:
+```bash
+./cleanup_for_public.sh
+```
+This removes sensitive files, organizes documentation, and updates .gitignore.
 
 ## MCP Servers Included
 
@@ -344,7 +379,14 @@ your_gate:
 - **tax-optimization-oracle**: CBC solver for complex optimization
 
 ### Market Data
-- **openbb-curated**: 44 carefully selected financial data tools
+- **openbb-curated**: 17 zero-cost financial data tools with failover
+  - Real-time quotes (Yahoo/Alpha Vantage)
+  - FX data (ECB/Frankfurter)
+  - Macro indicators (World Bank, IMF)
+  - News & sentiment (GDELT)
+  - Analyst coverage (Finnhub, FMP)
+  - Charting (QuickChart)
+  - Commodities (LBMA gold/silver)
 - **policy-events-service**: Congressional bills, federal rules, hearings
 
 ## Future Plans: Event-Driven Intelligence Layer
@@ -446,6 +488,41 @@ We welcome contributions, particularly in areas aligned with our event-driven ro
 GNU General Public License v3.0 - See [LICENSE](LICENSE) file for details.
 
 This project is licensed under GPL-3.0 due to the inclusion of the Double Finance Oracle component. For detailed licensing information about included components, see the [NOTICE](NOTICE) file.
+
+## Agent Systems
+
+This project uses **two complementary agent systems**:
+
+### 1. Claude Code CLI Agents (`.claude/agents/`)
+- Used for @-mention invocation in Claude Code
+- Integrated with Obsidian MCP tools for knowledge management
+- Example: `@portfolio-manager` for ad-hoc portfolio analysis
+
+### 2. Workflow Orchestration Agents (`agent-prompts/sub-agents/`)
+- Used for declarative workflow execution
+- File-based tools (LS, Read, Write) for session artifacts
+- Used by workflows in `config/workflows/`
+
+Both systems coexist and serve different purposes.
+
+## Directory Consolidation (2025-09-30)
+
+**Important**: All development has been consolidated to a single Linux location.
+
+### Migration Complete
+If you previously had a Windows directory at `C:\Users\[username]\investing`:
+- ✅ **Portfolio CSVs** migrated to `portfolio/`
+- ✅ **Session artifacts** migrated to `runs/`
+- ✅ **MCP configuration** migrated to `.mcp.json`
+- ✅ **API keys** secured in `.env` (not in config files)
+- ✅ **Agent definitions** migrated to `.claude/agents/`
+
+### Action Required
+1. Use the Linux directory: `/home/[user]/investing`
+2. Update Claude Code to use `.mcp.json` from Linux location
+3. **Safe to delete**: `C:\Users\[username]\investing` after verification
+
+See `C:\Users\[username]\investing/DEPRECATED_LOCATION.md` for details.
 
 ## Disclaimer
 
