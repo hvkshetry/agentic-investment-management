@@ -31,6 +31,8 @@ tests/
 
 # Personal settings and configs
 .env
+.env.local
+.mcp.json
 user_settings.json
 .openbb_platform/
 personal_settings.yaml
@@ -49,11 +51,24 @@ sample_portfolio.json
 
 # Cache and state files
 shared/cache/*.json
+!shared/cache/.gitkeep
 portfolio-state-mcp-server/state/*.json
+!portfolio-state-mcp-server/state/portfolio_state.example.json
+!portfolio-state-mcp-server/state/.gitkeep
 data/*:Zone.Identifier
 
 # Runs and session data
 runs/
+sessions/
+
+# Codex session logs
+.codex/
+
+# Matplotlib config cache
+.mplconfig/
+
+# Virtual environment
+.venv/
 
 # Oracle build artifacts (keep only source)
 oracle/__pycache__/

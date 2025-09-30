@@ -78,9 +78,10 @@ async def get_portfolio_state():
     from datetime import datetime
     
     try:
-        # Read the portfolio state file directly
-        state_file = '/home/hvksh/investing/portfolio-state-mcp-server/state/portfolio_state.json'
-        
+        # Read the portfolio state file - use environment variable or relative path
+        default_path = os.path.join(os.path.dirname(__file__), '..', 'portfolio-state-mcp-server', 'state', 'portfolio_state.json')
+        state_file = os.getenv('PORTFOLIO_STATE_PATH', default_path)
+
         with open(state_file, 'r') as f:
             data = json.load(f)
         

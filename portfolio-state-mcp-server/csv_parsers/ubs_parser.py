@@ -78,7 +78,7 @@ class UBSParser(BaseBrokerParser):
                     if not account_info:
                         account_info = account_id
                     
-                    # Parse account name (e.g., "(NE 55344) Hersh Trust")
+                    # Parse account name (e.g., "(ACCT 12345) Example Trust")
                     account_match = re.search(r'\(([^)]+)\)', account_info)
                     if account_match:
                         account_code = account_match.group(1)

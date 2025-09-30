@@ -1,7 +1,7 @@
 """Curated list of OpenBB tools for MCP server.
 
-This module defines a fixed set of 44 essential tools that provide comprehensive
-financial analysis capabilities while minimizing context consumption.
+This module defines a fixed set of 59 essential tools (44 original + 15 zero-cost)
+that provide comprehensive financial analysis capabilities while minimizing context consumption.
 
 IMPORTANT PARAMETER GUIDELINES FOR TOOLS:
 - news_company: Use limit=20 with yfinance provider
@@ -111,12 +111,46 @@ CURATED_TOOLS = frozenset({
     
     # Currency Tools (1 tool)
     "currency_price_historical",
-    
+
     # Commodity Tools (1 tool)
     "commodity_price_spot",
-    
+
     # Cryptocurrency Tools (1 tool)
     "crypto_price_historical",
+
+    # Zero-Cost Data Provider Tools (15 new tools)
+    # Real-time Quotes
+    "marketdata_quote",  # Yahoo/Alpha Vantage real-time quotes
+    "marketdata_quote_batch",  # Batch quote fetching
+
+    # FX & Currency
+    "fx_quote",  # Frankfurter/ECB FX rates
+    "fx_convert",  # Currency conversion
+    "fx_historical",  # Historical FX rates
+
+    # Global Macro
+    "economy_wb_indicator",  # World Bank indicators
+    "economy_imf_series",  # IMF macro data
+
+    # News & Sentiment
+    "news_search",  # GDELT news search
+    "news_search_company",  # Company-specific news
+
+    # Screener & Discovery
+    "equity_screener",  # FMP equity screener
+
+    # Analyst Coverage
+    "analyst_price_target",  # Finnhub price targets
+    "analyst_recommendations",  # Analyst buy/hold/sell
+    "analyst_estimates",  # Earnings estimates
+
+    # Charting
+    "chart_line",  # QuickChart line charts
+    "chart_bar",  # QuickChart bar charts
+
+    # Commodities
+    "commodity_gold",  # LBMA gold prices
+    "commodity_silver",  # LBMA silver prices
 })
 
 def is_curated_tool(tool_name: str) -> bool:

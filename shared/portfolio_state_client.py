@@ -126,7 +126,9 @@ class PortfolioStateClient:
             state_file_path: Path to portfolio state JSON file
         """
         self.use_portfolio_state = use_portfolio_state
-        self.state_file_path = state_file_path or "/home/hvksh/investing/portfolio-state-mcp-server/state/portfolio_state.json"
+        # Use environment variable or relative path to portfolio state
+        default_path = os.path.join(os.path.dirname(__file__), "..", "portfolio-state-mcp-server", "state", "portfolio_state.json")
+        self.state_file_path = state_file_path or os.getenv("PORTFOLIO_STATE_PATH", default_path)
         self._positions_cache = None
         self._cache_timestamp = None
         self.cache_ttl = timedelta(minutes=5)  # Cache for 5 minutes

@@ -2,7 +2,7 @@
 """
 Risk MCP Server v3 - Consolidated single-tool architecture
 One comprehensive tool for complete portfolio risk analysis
-Addresses feedback from ~/investing/feedback.md with maximum simplicity
+Addresses project feedback requirements with maximum simplicity
 """
 
 from fastmcp import FastMCP
@@ -954,7 +954,7 @@ if __name__ == "__main__":
     logger.info("• Distribution analysis (skew, kurtosis, fat tails)")
     logger.info("• Executive summary with recommendations")
     logger.info("")
-    logger.info("Addresses ~/investing/feedback.md requirements:")
+    logger.info("Addresses project feedback requirements:")
     logger.info("• Real market data via OpenBB/yfinance")
     logger.info("• Ledoit-Wolf covariance shrinkage")
     logger.info("• Fat-tail adjustments (Cornish-Fisher, Student-t)")
