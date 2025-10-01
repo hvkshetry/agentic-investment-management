@@ -233,6 +233,43 @@ Task(
 
 **Error Pattern**: If you see `"error": "GDELT error: gdelt unexpected error: Expecting value: line 1 column 1 (char 0)"`, this usually means GDELT rejected the query due to short keywords. Reformulate with longer terms.
 
+### SEC Filing Section Parser
+Use `mcp__openbb-curated__regulators_sec_section_extract` to extract specific sections from SEC filings (10-K, 10-Q, 8-K).
+
+**Features:**
+- Extracts specific sections (Item 1A Risk Factors, Item 7 MD&A, etc.)
+- Handles modern inline XBRL formats
+- Automatically chunks text to stay within token limits
+- Supports section aliases ("md&a" → Item 7, "risks" → Item 1A)
+
+**Usage:**
+```python
+# Extract Risk Factors and MD&A from 10-K
+result = mcp__openbb-curated__regulators_sec_section_extract(
+    url="https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm",
+    sections=["Item 1A", "Item 7"],
+    max_tokens=4500,
+    use_cache=True
+)
+```
+
+**Response limits:**
+- Maximum 2 chunks per section (max_chunks_per_section parameter)
+- Total response capped at ~15K tokens to stay under MCP's 25K limit
+- Sections automatically truncated if they exceed limits
+
+**Finding filing URLs:**
+```python
+# Use equity_fundamental_filings to get valid URLs
+filings = mcp__openbb-curated__equity_fundamental_filings(
+    provider="sec",
+    symbol="AAPL",
+    form_type="10-K",
+    limit=1
+)
+url = filings['results'][0]['report_url']
+```
+
 ## Session Structure
 ```
 /Investing/Context/Sessions/20250823_150000/
