@@ -71,6 +71,7 @@ def _register_zero_cost_tools(mcp: FastMCPOpenAPI) -> None:
     )
     from .chart_tools import mcp_chart_line, mcp_chart_bar
     from .commodities_tools import mcp_commodity_gold, mcp_commodity_silver
+    from .sec_filing_section_parser_v2 import regulators_sec_section_extract
 
     # Real-time Quotes
     mcp.tool(tags={"marketdata"})(mcp_marketdata_quote)
@@ -105,7 +106,10 @@ def _register_zero_cost_tools(mcp: FastMCPOpenAPI) -> None:
     mcp.tool(tags={"commodity"})(mcp_commodity_gold)
     mcp.tool(tags={"commodity"})(mcp_commodity_silver)
 
-    logger.info("✓ Registered 17 zero-cost custom MCP tools")
+    # SEC Filing Section Parser
+    mcp.tool(tags={"regulators"})(regulators_sec_section_extract)
+
+    logger.info("✓ Registered 18 zero-cost custom MCP tools")
 
 
 def create_mcp_server(settings: MCPSettings, fastapi_app: FastAPI) -> FastMCPOpenAPI:

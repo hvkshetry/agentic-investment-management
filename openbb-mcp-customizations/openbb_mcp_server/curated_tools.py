@@ -80,12 +80,11 @@ CURATED_TOOLS = frozenset({
     # XBRL & Company Facts
     "equity_compare_company_facts",  # SEC companyfacts API
     
-    # SEC/EDGAR Tools (6 new regulatory/filings tools)
+    # SEC/EDGAR Tools (5 regulatory/filings tools - keeping tested ones)
     "regulators_sec_filing_headers",  # Fast form classification
-    "regulators_sec_htm_file",  # Source HTML for LLM parsing
     "regulators_sec_rss_litigation",  # Enforcement & litigation feed
     "regulators_sec_cik_map",  # CIK/Symbol mapping
-    "regulators_sec_symbol_map",  # Symbol/CIK mapping  
+    "regulators_sec_symbol_map",  # Symbol/CIK mapping
     "regulators_sec_institutions_search",  # Find institutional CIKs
     
     # Fixed Income Tools (4 canonical tools)
@@ -118,7 +117,7 @@ CURATED_TOOLS = frozenset({
     # Cryptocurrency Tools (1 tool)
     "crypto_price_historical",
 
-    # Zero-Cost Data Provider Tools (15 new tools)
+    # Zero-Cost Data Provider Tools (17 new tools)
     # Real-time Quotes
     "marketdata_quote",  # Yahoo/Alpha Vantage real-time quotes
     "marketdata_quote_batch",  # Batch quote fetching
@@ -151,6 +150,9 @@ CURATED_TOOLS = frozenset({
     # Commodities
     "commodity_gold",  # LBMA gold prices
     "commodity_silver",  # LBMA silver prices
+
+    # SEC Filing Section Parser
+    "regulators_sec_section_extract",  # Section-based parsing for 10-K/10-Q/8-K
 })
 
 def is_curated_tool(tool_name: str) -> bool:
