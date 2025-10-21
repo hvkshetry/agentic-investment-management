@@ -3,6 +3,49 @@
 ## Overview
 This guide provides comprehensive documentation for AI agents (Claude, Gemini, etc.) to effectively use the investment management MCP servers. Each server specializes in different aspects of portfolio management with validated inputs and outputs.
 
+## Quick Reference: MCP Tool Names
+
+### Portfolio State Server
+- `mcp__portfolio-state-server__get_portfolio_state`
+- `mcp__portfolio-state-server__import_broker_csv`
+- `mcp__portfolio-state-server__update_market_prices`
+- `mcp__portfolio-state-server__simulate_sale`
+- `mcp__portfolio-state-server__get_tax_loss_harvesting_opportunities`
+- `mcp__portfolio-state-server__record_transaction`
+
+### Portfolio Optimization Server
+- `mcp__portfolio-optimization-server__optimize_portfolio_advanced`
+
+### Risk Server
+- `mcp__risk-server__analyze_portfolio_risk` (includes stress testing)
+- `mcp__risk-server__get_risk_free_rate`
+
+### Tax Server
+- `mcp__tax-server__calculate_comprehensive_tax`
+
+### Tax Optimization Server
+- `mcp__tax-optimization-server__optimize_portfolio_for_taxes`
+- `mcp__tax-optimization-server__find_tax_loss_harvesting_pairs`
+- `mcp__tax-optimization-server__simulate_withdrawal_tax_impact`
+
+### ❌ NON-EXISTENT TOOLS (Do not use)
+- `mcp__risk-server__stress_test_portfolio` - Stress testing is part of `analyze_portfolio_risk`
+
+### ✅ Critical Usage Notes
+1. **Native Python types required**: All MCP tools need native Python types, NOT JSON strings
+   - ✅ CORRECT: `tickers=["SPY", "AGG"], weights=[0.5, 0.5]`
+   - ❌ WRONG: `tickers="[\"SPY\", \"AGG\"]", weights="[0.5, 0.5]"`
+
+2. **Standard workflow pattern**:
+   - Start with `get_portfolio_state` to get current holdings
+   - Extract tickers and weights from the state response
+   - Pass these to optimization/risk tools as native lists
+   - Write results to session directory `./runs/<timestamp>/`
+
+3. **Stress testing**: Use `analyze_portfolio_risk` with `analysis_options={"include_stress_test": True}`
+
+---
+
 ## Available MCP Servers
 
 ### 1. Portfolio State Server (`portfolio-state-mcp-server`)

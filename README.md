@@ -299,6 +299,38 @@ If you previously had `C:\Users\[username]\investing`:
 - ✅ Safe to delete Windows directory after verification
 - See `DEPRECATED_LOCATION.md` in old location for details
 
+## Documentation
+
+### Core Documentation (Start Here)
+- **[CLAUDE.md](CLAUDE.md)** - Main orchestrator instructions for AI agents
+- **[TOOLS_GUIDE.md](TOOLS_GUIDE.md)** - Comprehensive MCP server tools reference
+  - Quick reference section for all tool names
+  - Detailed documentation with request/response examples
+  - Best practices and common pitfalls
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design patterns
+
+### Workflow Documentation
+- **[.claude/commands/](/.claude/commands/)** - Slash command workflow definitions
+  - `daily-check.md` - Daily monitoring workflow
+  - `rebalance.md` - Full portfolio rebalancing
+  - `import-portfolio.md` - Portfolio import process
+
+### Agent Prompts
+- **[agent-prompts/](agent-prompts/)** - Specialized agent definitions
+  - Sub-agent prompts for analysis tasks
+  - Agent coordination patterns
+  - Gate validation procedures
+
+### Configuration & Schemas
+- **[schemas/](schemas/)** - Artifact schemas and validation rules
+- **[orchestrator/](orchestrator/)** - Workflow orchestration code
+
+### Historical Documentation
+- **[documentation/archive/](documentation/archive/)** - Historical analysis and development notes
+  - Pre-consolidation documentation
+  - Development summaries from August 2024
+  - Historical fix reports
+
 ## Contributing
 
 We welcome contributions, particularly:
@@ -336,7 +368,3 @@ Built with:
 This system is for educational and research purposes. Not financial advice. Always consult qualified financial advisors for investment decisions.
 
 The software is provided "as is", without warranty of any kind. See LICENSE for full details.
-
----
-
-**For detailed documentation, see the `/docs` directory**

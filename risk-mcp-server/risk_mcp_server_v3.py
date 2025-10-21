@@ -868,11 +868,17 @@ async def analyze_portfolio_risk(
         result["risk_metrics"]["status"] = es_status
 
         # Populate schema-required halt_status at top level
+        # Schema requires: halt_required, es_breach, liquidity_breach, concentration_breach, reasons
+        halt_reasons = []
+        if halt_required:
+            halt_reasons.append("ES @ 97.5% exceeds 2.5% limit")
+
         result["halt_status"] = {
-            "required": halt_required,
-            "reason": "ES @ 97.5% exceeds 2.5% limit" if halt_required else None,
-            "es_975_1day": es_975_value,
-            "es_limit": es_limit
+            "halt_required": halt_required,
+            "es_breach": halt_required,  # Currently only checking ES
+            "liquidity_breach": False,   # Not yet implemented
+            "concentration_breach": False,  # Checked separately in concentration_analysis
+            "reasons": halt_reasons
         }
 
         result["executive_summary"] = {
