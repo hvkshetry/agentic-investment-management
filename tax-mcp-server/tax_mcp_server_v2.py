@@ -89,7 +89,32 @@ async def calculate_comprehensive_tax(
     try:
         # Handle MCP JSON string serialization
         import json
-        
+
+        # Normalize filing status to tenforty format
+        # Map human-readable values to tenforty enum values
+        filing_status_map = {
+            "married filing jointly": "Married/Joint",
+            "married jointly": "Married/Joint",
+            "joint": "Married/Joint",
+            "married/joint": "Married/Joint",
+            "married filing separately": "Married/Separate",
+            "married separately": "Married/Separate",
+            "married/separate": "Married/Separate",
+            "head of household": "Head of Household",
+            "single": "Single",
+            "qualifying widow": "Qualifying Widow(er)",
+            "qualifying widower": "Qualifying Widow(er)",
+            "qualifying widow(er)": "Qualifying Widow(er)"
+        }
+
+        # Normalize filing status (case-insensitive)
+        filing_status_lower = filing_status.lower()
+        if filing_status_lower in filing_status_map:
+            original_filing_status = filing_status
+            filing_status = filing_status_map[filing_status_lower]
+            if original_filing_status != filing_status:
+                logger.info(f"Normalized filing_status from '{original_filing_status}' to '{filing_status}'")
+
         # Convert JSON strings to native types if needed (MCP protocol serializes to JSON)
         if isinstance(income_sources, str):
             try:

@@ -201,7 +201,8 @@ def extract_items_from_html(
     filing_type: str,
     url: str,
     sections: Optional[List[str]] = None,
-    filing_date: Optional[str] = None
+    filing_date: Optional[str] = None,
+    include_tables: bool = False
 ) -> Dict[str, str]:
     """Extract sections from SEC filing HTML using edgar-crawler.
 
@@ -211,6 +212,7 @@ def extract_items_from_html(
         url: SEC filing URL
         sections: List of section names to extract (None = all)
         filing_date: Filing date in YYYY-MM-DD format
+        include_tables: Whether to include tables in extracted text
 
     Returns:
         Dict mapping section names to extracted text
@@ -241,7 +243,7 @@ def extract_items_from_html(
 
         # Create ExtractItems instance
         extractor = ExtractItems(
-            remove_tables=False,  # Keep tables
+            remove_tables=not include_tables,  # Honor include_tables parameter
             items_to_extract=items_to_extract,
             include_signature=False,
             raw_files_folder=str(raw_folder.parent),
@@ -336,7 +338,8 @@ async def regulators_sec_section_extract(
             filing_type,
             url,  # Pass URL for metadata extraction
             sections,
-            None  # filing_date
+            None,  # filing_date
+            include_tables  # Pass through include_tables parameter
         )
 
         if not extracted:
@@ -418,19 +421,28 @@ async def regulators_sec_section_extract(
             sections_output.append(result_entry)
             total_tokens += estimated_tokens
 
-        # Build response
+        # Build response with truncation summary
+        truncated_sections = [s["section_name"] for s in sections_output if s.get("status") == "truncated"]
+
+        metadata = {
+            "total_sections": len(sections_output),
+            "successful_extractions": len(sections_output),
+            "total_estimated_tokens": total_tokens,
+            "extraction_engine": "edgar-crawler (nlpaueb)",
+            "include_tables": include_tables
+        }
+
+        # Add truncation warning to metadata if any sections were truncated
+        if truncated_sections:
+            metadata["truncation_warning"] = f"{len(truncated_sections)} section(s) truncated: {', '.join(truncated_sections)}"
+            metadata["truncated_sections"] = truncated_sections
+
         return {
             "url": url,
             "filing_type": filing_type,
             "sections": sections_output,
             "available_sections": list(extracted.keys()),
-            "metadata": {
-                "total_sections": len(sections_output),
-                "successful_extractions": len(sections_output),
-                "total_estimated_tokens": total_tokens,
-                "extraction_engine": "edgar-crawler (nlpaueb)",
-                "include_tables": include_tables
-            }
+            "metadata": metadata
         }
 
     except Exception as e:

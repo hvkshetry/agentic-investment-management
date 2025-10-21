@@ -8,6 +8,7 @@ Addresses project feedback requirements with maximum simplicity
 from fastmcp import FastMCP
 from typing import Dict, List, Optional, Any
 import numpy as np
+import pandas as pd
 from scipy import stats
 import logging
 import sys
@@ -160,12 +161,18 @@ async def analyze_portfolio_risk(
                 "basic": {},
                 "var_analysis": {},
                 "advanced_measures": {},
-                "distribution_analysis": {}
+                "distribution_analysis": {},
+                # Schema-required ES fields (populated later)
+                "es_975_1day": None,
+                "es_limit": 0.025,
+                "es_utilization": None,
+                "status": None
             },
             "risk_decomposition": {},
             "stress_testing": {},
             "confidence": {},
-            "metadata": {}
+            "metadata": {},
+            "halt_status": None  # Schema-required field (populated later)
         }
         
         # =========================
@@ -217,15 +224,9 @@ async def analyze_portfolio_risk(
         # 3. BUILD COMPREHENSIVE RISK STACK (ES PRIMARY)
         # =========================
         
-        # Calibrate ES limit from historical VaR policy
-        historical_var_limit = 0.02  # 2% VaR limit
-        es_limit = RiskConventions.calibrate_es_from_var(
-            portfolio_returns,
-            var_limit=historical_var_limit,
-            var_alpha=0.95,
-            es_alpha=0.975,
-            target_breach_freq=0.05
-        )
+        # ES limit is FIXED at 2.5% - NON-NEGOTIABLE BINDING CONSTRAINT
+        # Do NOT calibrate or adjust this limit
+        es_limit_binding = 0.025  # 2.5% at 97.5% confidence
         
         # Calculate Expected Shortfall (primary metric)
         es_975 = RiskConventions.compute_expected_shortfall(
@@ -410,7 +411,7 @@ async def analyze_portfolio_risk(
         
         # Add risk stack to result
         result["risk_stack"] = risk_stack.to_dict()
-        result["risk_stack"]["es_limit_calibrated"] = float(es_limit)
+        result["risk_stack"]["es_limit_binding"] = float(es_limit_binding)  # FIXED 2.5% limit
         
         # =========================
         # 3b. ETF LOOKTHROUGH CONCENTRATION ANALYSIS
@@ -851,15 +852,44 @@ async def analyze_portfolio_risk(
         }
         
         # =========================
-        # 10. EXECUTIVE SUMMARY
+        # 10. EXECUTIVE SUMMARY WITH ES METRICS
         # =========================
+        # Extract ES metrics for top-level access (CRITICAL for gating)
+        es_975_value = abs(es_975["value"])
+        es_limit = 0.025  # BINDING CONSTRAINT: 2.5% at 97.5% confidence
+        halt_required = es_975_value > es_limit
+        es_utilization = es_975_value / es_limit if es_limit > 0 else 0
+        es_status = "breach" if halt_required else "pass"
+
+        # Populate schema-required fields in risk_metrics
+        result["risk_metrics"]["es_975_1day"] = es_975_value
+        result["risk_metrics"]["es_limit"] = es_limit
+        result["risk_metrics"]["es_utilization"] = es_utilization
+        result["risk_metrics"]["status"] = es_status
+
+        # Populate schema-required halt_status at top level
+        result["halt_status"] = {
+            "required": halt_required,
+            "reason": "ES @ 97.5% exceeds 2.5% limit" if halt_required else None,
+            "es_975_1day": es_975_value,
+            "es_limit": es_limit
+        }
+
         result["executive_summary"] = {
             "risk_level": "HIGH" if annual_vol > 0.20 else "MODERATE" if annual_vol > 0.10 else "LOW",
+            "es_975_1day": es_975_value,  # PRIMARY RISK METRIC
+            "es_limit": es_limit,  # BINDING CONSTRAINT
+            "halt_required": halt_required,  # HALT if True
+            "es_status": "⚠️ BREACH - HALT TRADING" if halt_required else "✅ Within Limits",
             "key_risks": [],
             "recommendations": []
         }
         
-        # Generate key risks
+        # Generate key risks (ES BREACH FIRST - MOST CRITICAL)
+        if halt_required:
+            result["executive_summary"]["key_risks"].append(
+                f"⚠️ HALT REQUIRED: ES @ 97.5% = {es_975_value:.2%} exceeds limit of {es_limit:.2%}"
+            )
         if max_drawdown < -0.20:
             result["executive_summary"]["key_risks"].append(f"High drawdown risk: {max_drawdown:.1%}")
         if kurtosis > 2:

@@ -310,19 +310,24 @@ class RealOrchestrator:
         )
         
     def _check_risk_gate(self, artifact: Dict[str, Any]) -> bool:
-        """Check if risk gate passes"""
+        """Check if risk gate passes - ES @ 97.5% is PRIMARY binding constraint"""
         payload = artifact.get("payload", {})
-        
-        # Check VaR limit
-        var_95 = abs(payload.get("var_95", 0))
-        if var_95 > 0.025:  # 2.5% daily VaR limit
+
+        # PRIMARY GATE: Expected Shortfall @ 97.5% confidence
+        # Extract from executive_summary (new risk server format)
+        exec_summary = payload.get("executive_summary", {})
+        es_975 = exec_summary.get("es_975_1day")
+        halt_required = exec_summary.get("halt_required", False)
+
+        # BINDING CONSTRAINT: ES @ 97.5% must be ≤ 2.5%
+        if halt_required or (es_975 is not None and es_975 > 0.025):
             return False
-            
-        # Check drawdown limit
+
+        # Secondary check: max drawdown limit (reference only)
         max_dd = abs(payload.get("max_drawdown", 0))
         if max_dd > 0.20:  # 20% max drawdown limit
             return False
-            
+
         return payload.get("status") == "pass"
         
     def _check_tax_gate(self, artifact: Dict[str, Any]) -> bool:

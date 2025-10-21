@@ -12,12 +12,20 @@ logger = logging.getLogger(__name__)
 
 class GovInfoBulkClient:
     """Lightweight GovInfo API client"""
-    
+
     BASE_URL = "https://api.govinfo.gov"
-    
+
     def __init__(self):
         self.api_key = os.getenv("GOVINFO_API_KEY")
         self.session = None
+
+    def _validate_api_key(self):
+        """Validate that API key is configured"""
+        if not self.api_key:
+            raise ValueError(
+                "Missing GOVINFO_API_KEY environment variable. "
+                "Get your free API key at https://www.govinfo.gov/api-signup/"
+            )
         
     async def __aenter__(self):
         self.session = httpx.AsyncClient(timeout=30.0)
@@ -37,9 +45,11 @@ class GovInfoBulkClient:
         Get all Federal Register documents in date range.
         Returns minimal metadata for LLM analysis.
         """
+        self._validate_api_key()
+
         if not self.session:
             self.session = httpx.AsyncClient(timeout=30.0)
-            
+
         rules = []
         
         # Calculate date range
@@ -131,10 +141,16 @@ class GovInfoBulkClient:
                         
             logger.info(f"Retrieved {len(rules)} Federal Register documents")
             
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error fetching Federal Register documents: {e}")
+            raise ValueError(
+                f"GovInfo API error: {e.response.status_code}. "
+                f"Verify your GOVINFO_API_KEY is valid at https://www.govinfo.gov/api-signup/"
+            )
         except Exception as e:
             logger.error(f"Error fetching Federal Register documents: {e}")
-            return []
-            
+            raise ValueError(f"Failed to fetch Federal Register documents from GovInfo: {str(e)}")
+
         return rules[:max_results]
     
     async def _get_package_summary(self, package_id: str) -> Dict[str, Any]:
@@ -199,12 +215,14 @@ class GovInfoBulkClient:
         Get full details for specific rules identified by LLM.
         Enhanced to fetch content from Federal Register API when available.
         Document numbers can be either:
-        - Granule IDs (e.g., "2025-15325") 
+        - Granule IDs (e.g., "2025-15325")
         - Package IDs with granule (e.g., "FR-2025-08-12:2025-15325")
         """
+        self._validate_api_key()
+
         if not self.session:
             self.session = httpx.AsyncClient(timeout=30.0)
-            
+
         detailed_rules = []
         
         for doc_num in document_numbers:

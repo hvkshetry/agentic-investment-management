@@ -1,21 +1,19 @@
 # AI Investment Management System
 
-An institutional-grade, workflow-driven investment platform that orchestrates specialized AI agents through deterministic workflows to deliver comprehensive portfolio management, risk analysis, and tax optimization.
+An institutional-grade investment platform orchestrating specialized AI agents through deterministic workflows for comprehensive portfolio management, risk analysis, and tax optimization.
 
 ## Key Innovation: Workflow-Driven Architecture
 
 This system represents a paradigm shift from ad-hoc tool usage to **deterministic, workflow-driven portfolio management**. Instead of agents making isolated decisions, they collaborate through structured workflows with defined stages, gates, and validation layers.
 
-### Core Principles
-- **Declarative Workflows**: Define investment processes in YAML, not code
+**Core Principles:**
+- **Declarative Workflows**: Define investment processes via slash commands, not code
 - **Policy Gates**: Automated compliance checks prevent pathological optimizations
 - **Artifact Contracts**: Standardized data flow between agents
 - **Audit Trail**: Complete session history in `./runs/<timestamp>/`
-- **Natural Language Control**: Seed workflows with plain English instructions
+- **Tool-First Data**: All metrics from MCP servers—no estimation allowed
 
 ## System Architecture
-
-### Three-Layer Design
 
 ```
 ┌─────────────────────────────────────────┐
@@ -25,12 +23,10 @@ This system represents a paradigm shift from ad-hoc tool usage to **deterministi
                     ↓
 ┌─────────────────────────────────────────┐
 │         Workflow Engine                  │
-│   (Declarative YAML Configurations)      │
-│                                          │
-│  • rebalance_tlh.yaml                   │
-│  • daily_check.yaml                     │
-│  • portfolio_import.yaml                │
-│  • [Your custom workflows...]           │
+│   Accessible via Slash Commands:        │
+│   • /daily-check                        │
+│   • /rebalance                          │
+│   • /import-portfolio                   │
 └─────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────┐
@@ -56,17 +52,17 @@ This system represents a paradigm shift from ad-hoc tool usage to **deterministi
 │  • portfolio-optimization-v3            │
 │  • tax-server-v2                        │
 │  • tax-optimization-oracle              │
-│  • openbb-curated (17 zero-cost tools) │
+│  • openbb-curated (18 zero-cost tools) │
 │  • policy-events-service                │
 └─────────────────────────────────────────┘
 ```
 
-## Critical System Improvements (2025-01-18)
+## Critical Risk Management
 
-### Expected Shortfall (ES) Primary Risk Management
-The system now uses **Expected Shortfall at 97.5% confidence** as the primary risk metric, replacing VaR-based decisions. ES provides superior tail risk measurement by showing the average loss beyond VaR threshold.
+### Expected Shortfall (ES) Primary Constraint
+**ES @ 97.5% confidence must remain below 2.5%**—this is the binding risk limit, not VaR. Expected Shortfall measures the average loss beyond the VaR threshold, providing superior tail risk measurement.
 
-- **ES Limit**: 2.5% (binding constraint)
+- **ES Limit**: 2.5% (NON-NEGOTIABLE)
 - **HALT Protocol**: Automatic trading stop if ES exceeds limit
 - **Round-2 Gate**: Mandatory validation for all portfolio revisions
 
@@ -78,408 +74,238 @@ Strict enforcement of data integrity with mandatory provenance tracking:
 - Missing data explicitly noted with "needs" entries
 
 ### Concentration Risk Management
-Improved concentration limit implementation:
-- ALL funds (ETFs, Mutual Funds, CEFs) are EXEMPT from limits
+- ALL funds (ETFs, mutual funds, CEFs) are EXEMPT from individual limits
 - Only individual stocks subject to 20% position limit
 - Lookthrough analysis for true underlying exposure
 - Automatic HALT if concentration breach detected
 
-### Tax Reconciliation System
-Single-source-of-truth for all tax calculations with:
+### Tax Reconciliation
+Single-source-of-truth for tax calculations:
 - Recomputation on every portfolio revision
 - Immutable tax artifacts with checksums
 - FIFO lot selection and wash sale detection
 - Complete audit trail for IRS compliance
-- Tax year 2025 support added
 
-### Key Components
-- `shared/risk_conventions.py`: Standardized risk calculations
-- `orchestrator/round2_gate.py`: Mandatory revision validation
-- `tax-mcp-server/tax_reconciliation.py`: Tax single-source-of-truth
-- `shared/optimization/cvxpy_optimizer.py`: Proper constraint handling
+## Slash Command Workflows
 
-See `documentation/COMPLETE_FIX_SUMMARY.md` for full details.
+Access pre-built workflows via simple commands:
 
-## Pre-Built Workflows
+**`/daily-check`** - Morning portfolio monitoring with risk alerts and action triggers
 
-### 1. **Portfolio Rebalancing with Tax Loss Harvesting** (`rebalance_tlh.yaml`)
-Full institutional-grade rebalancing with multiple optimization methods, risk validation, and tax efficiency.
+**`/rebalance`** - Full institutional-grade rebalancing with:
+- Multiple optimization methods (HRP, MaxSharpe, Risk Parity)
+- Risk validation and stress testing
+- Tax loss harvesting integration
+- Policy gate validation
+- IC memo generation
 
-**Natural Language Trigger:**
-```
-"Rebalance my portfolio to 80% equity / 20% fixed income with tax efficiency"
-```
+**`/import-portfolio`** - Import and validate broker CSV files
 
-**Workflow Stages:**
-1. Portfolio import from CSV
-2. Parallel market analysis (macro, equity, fixed income)
-3. Multiple optimization candidates (HRP, MaxSharpe, etc.)
-4. Risk validation and stress testing
-5. Tax impact analysis and harvesting
-6. Policy gate validation
-7. Final selection and trade list
-8. IC memo generation
-
-### 2. **Daily Portfolio Check** (`daily_check.yaml`)
-Lightweight morning monitoring with risk alerts and action triggers.
-
-**Natural Language Trigger:**
-```
-"Run my daily portfolio check"
-```
-
-### 3. **Portfolio Import** (`portfolio_import.yaml`)
-Import and validate portfolio data from broker CSV files.
-
-**Natural Language Trigger:**
-```
-"Import my portfolio statements from Vanguard and UBS"
-```
+Each workflow executes a deterministic sequence of agents, validates through policy gates, and generates a complete audit trail in `./runs/<timestamp>/`.
 
 ## Policy Gates System
 
-### Automated Safeguards (ES-Primary)
-- **Risk Gate**: ES limits (2.5% at 97.5% confidence), VaR reference only
+Automated safeguards prevent pathological optimizations:
+
+- **Risk Gate**: ES @ 97.5% ≤ 2.5% (binding), VaR reference only
 - **Tax Gate**: Single-source-of-truth reconciliation, wash sale prevention
 - **Compliance Gate**: Regulatory requirements, account minimums
 - **Realism Gate**: Prevents impossible Sharpe ratios (>3.0)
 - **Credibility Gate**: Multi-source validation requirements
 - **Round-2 Gate**: MANDATORY validation for all portfolio revisions
-- **HALT Protocol**: Automatic trading stop if ES > 2.5% or critical failures
+- **HALT Protocol**: Automatic trading stop on critical failures
 
-### Example: ES-Primary Risk Control
-```yaml
-# config/policy/risk_limits.yaml
-risk_limits:
-  es_limit: 0.025           # 2.5% Expected Shortfall (BINDING)
-  es_alpha: 0.975           # 97.5% confidence level
-  var_limit: 0.020          # 2.0% VaR (reference only)
-position_limits:
-  max_single_position: 0.15  # 15% max concentration
-  min_positions: 15          # Ensures diversification
-halt_triggers:
-  es_breach: true           # HALT if ES > 2.5%
-  liquidity_crisis: 0.3     # HALT if liquidity score < 0.3
-```
+## MCP Servers (7 Total)
 
-## Creating Custom Workflows
+### Portfolio & Analysis (5 servers)
+- **portfolio-state-server**: Single source of truth for holdings and tax lots
+- **risk-server-v3**: Advanced risk metrics (ES, VaR, CVaR, stress tests)
+- **portfolio-optimization-v3**: PyPortfolioOpt + Riskfolio-Lib integration
+- **tax-server-v2**: Federal/state tax calculations (2018-2025)
+- **tax-optimization-oracle**: CBC solver for tax-aware optimization
 
-Workflows are defined in YAML and live in `config/workflows/`. Here's a template:
-
-```yaml
-workflow: your_workflow_name
-description: What this workflow accomplishes
-schedule: on_demand  # or: daily, weekly, monthly
-
-# Token budget (guideline, not hard limit)
-guidelines:
-  target_tokens: 50000
-
-# Agent sequence with dependencies
-sub_agents_sequence:
-  - id: step_1
-    name: portfolio-manager
-    task: |
-      Your detailed task instructions here
-    outputs: [artifact_name]
-    
-  - id: step_2
-    name: risk-analyst
-    task: |
-      Analyze the portfolio for risk
-    depends_on: [step_1]
-    outputs: [risk_report]
-    gates: [risk_gate]
-
-# Gate definitions
-gates:
-  risk_gate:
-    checks:
-      - var_95 <= 0.02
-      - sharpe_ratio >= 0.5
-
-# Action triggers
-triggers:
-  alert_user:
-    conditions:
-      - risk_level == "HIGH"
-    action: send_notification
-```
+### Market Data & Intelligence (2 servers)
+- **openbb-curated**: 18 zero-cost financial data tools
+  - Real-time quotes (Yahoo/Alpha Vantage)
+  - FX data (ECB/Frankfurter)
+  - Macro indicators (World Bank, IMF)
+  - News & sentiment (GDELT)
+  - Analyst coverage (Finnhub, FMP)
+  - SEC filing section parser (edgar-crawler)
+  - Charting (QuickChart)
+  - Commodities (LBMA gold/silver)
+- **policy-events-service**: Congressional bills, federal rules, hearings
 
 ## Getting Started
 
 ### Prerequisites
-1. **Claude Code CLI** installed and configured
-2. **Python 3.10+** with virtual environment
-3. **WSL/Linux** (recommended) or macOS
-4. **Portfolio CSV files** in supported format
+1. Claude Code CLI installed and configured
+2. Python 3.10+ with virtual environment
+3. WSL/Linux (recommended) or macOS
+4. Portfolio CSV files from your broker
 
-**Note**: This project runs entirely in Linux (WSL or native). If you have a Windows directory at `C:\Users\[username]\investing`, it's deprecated - see consolidation notes below.
+### Quick Setup
 
-### Installation
-
-1. Clone the repository:
+1. **Clone and install:**
 ```bash
-git clone https://github.com/[your-username]/ai-investment-management.git
+git clone <repository-url>
 cd ai-investment-management
-```
-
-2. Set up Python environment:
-```bash
 python -m venv openbb
 source openbb/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Configure API keys (copy template and add your keys):
+2. **Configure API keys** (optional—works with free-tier only):
 ```bash
 cp .env.example .env
-# Edit .env and add your API keys
+# Add API keys if you have them (Alpha Vantage, Finnhub, FMP)
+# System works without any paid APIs using Yahoo Finance
 ```
 
-**Zero-Cost Setup**: The system works with free-tier API keys:
-- **Required**: None (Yahoo Finance works without keys)
-- **Recommended**: Alpha Vantage (free tier: 5 calls/min)
-- **Optional**: Finnhub, FMP for analyst coverage
-
-See `documentation/ZERO_COST_DEPLOYMENT_CHECKLIST.md` for full setup guide.
-
-4. Configure MCP servers by copying the template:
+3. **Set up MCP servers:**
 ```bash
 cp .mcp.json ~/.claude/mcp_servers.json
-# Edit paths if needed (should work as-is for standard installation)
+# Edit paths if needed (should work as-is)
 ```
 
-Alternatively, manually configure in `~/.claude/settings.json`:
-```json
-{
-  "mcpServers": {
-    "portfolio-state-server": {
-      "command": "/home/[user]/investing/.venv/bin/python",
-      "args": ["/home/[user]/investing/portfolio-state-mcp-server/portfolio_state_server.py"],
-      "env": {
-        "PYTHONPATH": "/home/[user]/investing:/home/[user]/investing/shared"
-      }
-    }
-    // ... see .mcp.json for all 7 servers
-  }
-}
-```
+4. **Place your portfolio CSVs** in the `portfolio/` directory
 
-5. Place portfolio CSVs in designated directory:
-```
-/path/to/portfolio/
-├── vanguard.csv
-└── ubs.csv
-```
+### Run Your First Workflow
 
-### Running Your First Workflow
-
-Simply tell the orchestrator in natural language:
+Simply use the slash command in Claude Code:
 
 ```
-"I need to rebalance my portfolio to 70% equity and 30% bonds. 
-Focus on minimizing taxes and keeping risk under control."
+/import-portfolio
 ```
 
-The system will:
-1. Parse your intent
-2. Select appropriate workflow
-3. Execute all stages
-4. Validate through gates
-5. Generate IC memo
-6. Present recommendations
+Follow up with:
+
+```
+/daily-check
+```
+
+Or for full rebalancing:
+
+```
+/rebalance with target allocation: 80% equity, 20% fixed income
+```
+
+The system will execute the workflow, validate through gates, and present recommendations with a complete audit trail in `./runs/<timestamp>/`.
 
 ## Session Artifacts
 
-Every workflow execution creates a timestamped session directory:
+Every workflow execution creates a timestamped directory with:
 
 ```
 ./runs/20250113_143022/
 ├── portfolio_snapshot.json       # Current holdings
 ├── macro_context.json           # Economic analysis
 ├── equity_analysis.json         # Stock valuations
-├── optimization_candidate_1.json # HRP method
-├── optimization_candidate_2.json # MaxSharpe method
-├── risk_report_1.json           # Risk validation
-├── tax_impact_1.json            # Tax consequences
+├── optimization_candidate_*.json # Multiple strategies tested
+├── risk_report_*.json           # Risk validation
+├── tax_impact_*.json            # Tax consequences
 ├── gate_validation.json         # Policy compliance
 ├── trade_list.json              # Final orders
-├── invariant_report.json        # Math validation
 └── ic_memo.md                   # Executive summary
 ```
 
 ## Customization
 
 ### Adding New Agents
-Create a new file in `agent-prompts/sub-agents/` following the template:
-
-```yaml
----
-name: your-agent-name
-description: When this agent should be invoked
-tools: tool1, tool2, mcp__your-server__method
----
-
-You are a specialist in [domain].
-
-## MANDATORY WORKFLOW
-1. **Receive session directory**: You will be provided `./runs/<timestamp>/`
-2. **Read dependencies**: Load required artifacts from session
-3. **Perform analysis**: Execute your specialized task
-4. **Write results**: Create your_analysis.json in session directory
-
-## Task Execution Steps
-[Detailed steps for completing tasks]
-```
+Create a file in `agent-prompts/sub-agents/` following the YAML template structure. Your agent receives a session directory, reads dependencies, performs analysis, and writes results.
 
 ### Adding New Gates
-Define policy limits in `config/policy/`:
+Define policy limits in `config/policy/` as YAML files with your constraints and thresholds.
 
-```yaml
-# config/policy/your_limits.yaml
-your_gate:
-  max_metric: 0.10
-  min_threshold: 20
-  required_conditions:
-    - condition_1
-    - condition_2
-```
+### Creating Custom Workflows
+Define workflows in `config/workflows/` as YAML, then expose via slash command in `.claude/commands/`.
+
+## Advanced Features
+
+### Position Look-Through Analysis
+- Analyzes underlying holdings of ETFs and mutual funds
+- True concentration risk across direct and indirect positions
+- CUSIP-based identification from SEC filings
+- Supports 10,000+ fund mappings via FinanceDatabase
+
+### Enhanced Data Pipeline
+- SEC EDGAR integration for CUSIP-CIK mapping
+- FinanceDatabase integration (300,000+ symbols)
+- Automated CUSIP mappings for 320+ major securities
+- Real-time updates from SEC daily files
+
+### Tax Optimization
+- Municipal bond detection for tax-exempt income
+- Foreign tax credit tracking
+- Automated wash sale compliance (30-day rule)
+- Tax loss harvesting integrated into rebalancing
 
 ## Security & Compliance
 
 ### Data Protection
-- **No hardcoded credentials**: All sensitive data in `.env` (gitignored)
-- **API key management**: Template-based setup via `.env.example`
-- **Sensitive file exclusion**: Portfolio CSVs, state files, cache excluded from git
-- **Audit trail**: Complete session history for compliance
-- **Data isolation**: Each session has isolated artifacts
+- No hardcoded credentials (`.env` for all secrets)
+- Sensitive files excluded from git
+- Complete audit trail for compliance
+- Isolated artifacts per session
 
 ### Risk Controls
-- **Policy enforcement**: Automated gates prevent violations
-- **HALT protocol**: Automatic trading stop on ES breach (>2.5%)
-- **Read-only market data**: No execution without explicit approval
-- **Round-2 validation**: MANDATORY for all portfolio revisions
-- **Tool-first data policy**: No estimation or fabrication allowed
+- Automated policy gates prevent violations
+- HALT protocol on ES breach (>2.5%)
+- Round-2 mandatory validation
+- Tool-first data policy (no estimation)
 
-### Deployment
-Before public deployment, run:
+### Public Deployment
+Before sharing publicly, run:
 ```bash
 ./cleanup_for_public.sh
 ```
-This removes sensitive files, organizes documentation, and updates .gitignore.
 
-## MCP Servers Included
+## Important GDELT Usage Note
 
-### Portfolio & Analysis
-- **portfolio-state-server**: Single source of truth for holdings
-- **risk-server-v3**: Advanced risk metrics (VaR, CVaR, stress tests)
-- **portfolio-optimization-v3**: PyPortfolioOpt + Riskfolio-Lib
-- **tax-server-v2**: Federal/state tax calculations
-- **tax-optimization-oracle**: CBC solver for complex optimization
+When using news search tools powered by GDELT:
 
-### Market Data
-- **openbb-curated**: 17 zero-cost financial data tools with failover
-  - Real-time quotes (Yahoo/Alpha Vantage)
-  - FX data (ECB/Frankfurter)
-  - Macro indicators (World Bank, IMF)
-  - News & sentiment (GDELT)
-  - Analyst coverage (Finnhub, FMP)
-  - Charting (QuickChart)
-  - Commodities (LBMA gold/silver)
-- **policy-events-service**: Congressional bills, federal rules, hearings
+**❌ DON'T use abbreviations shorter than 3 characters:**
+- "AI" → Use "artificial intelligence"
+- "ML" → Use "machine learning"
+- "IoT" → Use "internet of things"
 
-## Future Plans: Event-Driven Intelligence Layer
+**✅ DO use full terms or exceptions:**
+- Geographic codes are OK: US, UK, EU, UN
+- Full phrases work best: "digital twin water systems"
 
-The next major evolution will integrate real-time event catalysts that drive options mispricing, focusing on machine-readable feeds that update on non-Wall Street timetables.
+GDELT rejects queries with keywords shorter than 3 characters. If you see GDELT errors, reformulate with longer terms.
 
-### Priority Event Feeds (Q1 2025)
+## Future Plans: Event-Driven Intelligence
 
-#### Healthcare & Regulatory
-- **FDA OpenFDA API**: Drug/device approvals, recalls, adverse events
-  - NDA/ANDA approvals posting at 4-8pm ET
-  - Class I/II recall monitoring
-  - FAERS adverse event spikes
-- **ClinicalTrials.gov API**: Trial status changes, results posting, completion dates
-- **CMS Coverage API**: NCD/LCD decisions, MEDCAC meetings affecting reimbursement
+The roadmap includes integrating real-time event catalysts for options mispricing:
 
-#### Market Structure & Trading
-- **NYSE/Nasdaq Halts**: LULD and news-pending halt feeds for volatility events
-- **FINRA Short Interest**: Enhanced short squeeze detection
-- **Options Flow**: Real-time unusual options activity detection
+### Priority Event Feeds (2025)
+- **Healthcare**: FDA OpenFDA API, ClinicalTrials.gov, CMS coverage decisions
+- **Market Structure**: NYSE/Nasdaq halts, FINRA short interest, unusual options activity
+- **Litigation**: CourtListener/RECAP federal filings, USPTO PTAB decisions, USITC investigations
+- **Environmental**: NOAA weather alerts, USGS earthquakes, PHMSA pipeline incidents, EPA enforcement
 
-#### Litigation & IP
-- **CourtListener/RECAP**: Federal court filings, dockets, alerts
-  - TROs, preliminary injunctions, class certifications
-  - Patent litigation milestones (Markman hearings, IPR decisions)
-- **USPTO PTAB**: Inter partes review decisions affecting biotech/pharma
-- **USITC Section 337**: Import ban investigations and determinations
+### Implementation Phases
+1. **Q1 2025**: Core event infrastructure with unified schema and entity resolution
+2. **Q2 2025**: Options intelligence with IV surface monitoring and skew analysis
+3. **Q3 2025**: Automated strategy generation for event-driven hedging and catalyst trading
 
-#### Environmental & Infrastructure
-- **NOAA/NWS Weather API**: Severe weather alerts affecting insurers, utilities
-- **USGS Earthquake API**: Seismic events impacting supply chains
-- **PHMSA Pipeline Incidents**: Energy infrastructure disruptions
-- **EPA ECHO Enforcement**: Environmental compliance actions
+## Directory Consolidation
 
-### Implementation Roadmap
+**All development consolidated to Linux location**: `/home/[user]/investing`
 
-#### Phase 1: Core Event Infrastructure (Q1 2025)
-- Unified event schema: `{timestamp, source, severity, entities, impact}`
-- Entity resolution: Map agency identifiers to CIK/ticker/CUSIP
-- Severity scoring heuristics by event type
-- Event persistence and replay capabilities
-
-#### Phase 2: Options Intelligence (Q2 2025)
-- Implied volatility surface monitoring
-- Term structure analysis around known catalysts
-- Skew trading signals from asymmetric event risks
-- Cross-asset correlation breaks
-
-#### Phase 3: Automated Strategy Generation (Q3 2025)
-- Event-driven portfolio hedging workflows
-- Catalyst-aware option structures (straddles, calendars, butterflies)
-- Risk recycling from harvested vol premium
-- Dynamic gate adjustments based on event probability
-
-### Technical Architecture Extensions
-
-#### New MCP Servers Planned
-- **event-catalyst-server**: Unified event ingestion and normalization
-- **options-analytics-server**: Greeks, surface fitting, strategy backtesting
-- **litigation-monitor-server**: PACER/CourtListener integration
-- **regulatory-tracker-server**: Multi-agency regulatory pipeline
-
-#### Workflow Enhancements
-- Event-triggered workflow activation
-- Conditional branching based on external signals
-- Multi-stage approval gates for event-driven trades
-- Real-time portfolio adjustment capabilities
-
-### Research Initiatives
-
-#### Machine Learning Applications
-- Event impact prediction from historical patterns
-- Natural language processing of regulatory documents
-- Anomaly detection in market microstructure
-- Cross-asset contagion modeling
-
-#### Advanced Risk Metrics
-- Jump risk decomposition
-- Regulatory event VaR
-- Litigation outcome probability modeling
-- Weather-adjusted sector exposures
+If you previously had `C:\Users\[username]\investing`:
+- ✅ All files migrated to Linux location
+- ✅ Safe to delete Windows directory after verification
+- See `DEPRECATED_LOCATION.md` in old location for details
 
 ## Contributing
 
-We welcome contributions, particularly in areas aligned with our event-driven roadmap:
-
-### Priority Contributions
-- Event feed integrations (FDA, CMS, NOAA, etc.)
+We welcome contributions, particularly:
+- Event feed integrations (FDA, CMS, NOAA, CourtListener)
 - Options analytics and Greeks calculations
-- Litigation and regulatory tracking workflows
-- Cross-asset correlation analysis
 - International market support
-- Alternative asset classes (crypto, real estate, commodities)
+- Alternative asset classes (crypto, real estate)
 - ESG/Impact investing metrics
 - Advanced ML-based risk models
 
@@ -487,73 +313,7 @@ We welcome contributions, particularly in areas aligned with our event-driven ro
 
 GNU General Public License v3.0 - See [LICENSE](LICENSE) file for details.
 
-This project is licensed under GPL-3.0 due to the inclusion of the Double Finance Oracle component. For detailed licensing information about included components, see the [NOTICE](NOTICE) file.
-
-## Agent Systems
-
-This project uses **two complementary agent systems**:
-
-### 1. Claude Code CLI Agents (`.claude/agents/`)
-- Used for @-mention invocation in Claude Code
-- Integrated with Obsidian MCP tools for knowledge management
-- Example: `@portfolio-manager` for ad-hoc portfolio analysis
-
-### 2. Workflow Orchestration Agents (`agent-prompts/sub-agents/`)
-- Used for declarative workflow execution
-- File-based tools (LS, Read, Write) for session artifacts
-- Used by workflows in `config/workflows/`
-
-Both systems coexist and serve different purposes.
-
-## Directory Consolidation (2025-09-30)
-
-**Important**: All development has been consolidated to a single Linux location.
-
-### Migration Complete
-If you previously had a Windows directory at `C:\Users\[username]\investing`:
-- ✅ **Portfolio CSVs** migrated to `portfolio/`
-- ✅ **Session artifacts** migrated to `runs/`
-- ✅ **MCP configuration** migrated to `.mcp.json`
-- ✅ **API keys** secured in `.env` (not in config files)
-- ✅ **Agent definitions** migrated to `.claude/agents/`
-
-### Action Required
-1. Use the Linux directory: `/home/[user]/investing`
-2. Update Claude Code to use `.mcp.json` from Linux location
-3. **Safe to delete**: `C:\Users\[username]\investing` after verification
-
-See `C:\Users\[username]\investing/DEPRECATED_LOCATION.md` for details.
-
-## Disclaimer
-
-This system is for educational and research purposes. Not financial advice. Always consult qualified financial advisors for investment decisions.
-
-The software is provided "as is", without warranty of any kind, express or implied. See the LICENSE file for full disclaimer.
-
-## New Features (Latest Release)
-
-### Position Look-Through Analysis
-- **ETF/Fund Transparency**: Analyzes underlying holdings of ETFs and mutual funds
-- **True Concentration Risk**: Aggregates exposure across direct holdings and fund positions
-- **CUSIP-Based Identification**: Maps securities using CUSIP identifiers from SEC filings
-- **Comprehensive Coverage**: Supports 10,000+ fund mappings via FinanceDatabase
-
-### Enhanced Data Pipeline
-- **SEC EDGAR Integration**: Automated CUSIP-CIK mapping from 13F filings
-- **FinanceDatabase Integration**: 300,000+ symbols with categorization
-- **Real-Time Updates**: SEC data files refreshed nightly
-- **CUSIP Mappings**: 320+ major securities pre-mapped
-
-### Tax Optimization Improvements
-- **Municipal Bond Detection**: Identifies tax-exempt securities
-- **Foreign Tax Credit Tracking**: Optimizes international holdings
-- **Wash Sale Compliance**: Automated 30-day rule enforcement
-- **Tax Loss Harvesting**: Integrated into rebalancing workflows
-
-### Testing & Validation
-- **Comprehensive Integration Tests**: `test_comprehensive_integration.py`
-- **CUSIP Mapping Builder**: `build_cusip_cik_mapping.py` for expanding coverage
-- **Fund Category Builder**: Automated categorization from FinanceDatabase
+This project uses GPL-3.0 due to the Double Finance Oracle component. See [NOTICE](NOTICE) for full licensing information.
 
 ## Data Sources
 
@@ -568,8 +328,14 @@ Built with:
 - [Claude Code](https://claude.ai/code) by Anthropic
 - [OpenBB](https://openbb.co/) for market data
 - [PyPortfolioOpt](https://github.com/robertmartin8/PyPortfolioOpt) for optimization
-- [Riskfolio-Lib](https://github.com/dcajasn/Riskfolio-Lib) for advanced risk measures
+- [Riskfolio-Lib](https://github.com/dcajasn/Riskfolio-Lib) for risk measures
 - [FinanceDatabase](https://github.com/JerBouma/FinanceDatabase) for security categorization
+
+## Disclaimer
+
+This system is for educational and research purposes. Not financial advice. Always consult qualified financial advisors for investment decisions.
+
+The software is provided "as is", without warranty of any kind. See LICENSE for full details.
 
 ---
 

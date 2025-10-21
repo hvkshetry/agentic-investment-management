@@ -16,6 +16,16 @@ from shared.provider_router import ProviderRouter, register_router
 logger = logging.getLogger(__name__)
 
 
+def _safe_float(value: Any) -> Optional[float]:
+    """Convert stringy numeric values to float, ignoring blanks."""
+    try:
+        if value in (None, "", "NA"):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class FinnhubAnalystFetcher:
     """Fetch analyst data from Finnhub."""
 
@@ -174,9 +184,98 @@ class FMPAnalystFetcher:
             raise ProviderError(f"FMP error: {e}")
 
 
+class AlphaVantageAnalystFetcher:
+    """Fallback analyst data from Alpha Vantage (free tier)."""
+
+    def __init__(self):
+        self.api_key = os.getenv("ALPHAVANTAGE_API_KEY")
+        if not self.api_key:
+            logger.warning("ALPHAVANTAGE_API_KEY not set - Alpha Vantage analyst data unavailable")
+
+        self.client = BaseHTTPTool(
+            provider_name="alpha_vantage",
+            base_url="https://www.alphavantage.co",
+            timeout=20.0,
+            cache_ttl=3600
+        )
+
+    async def fetch_price_target(self, symbol: str) -> Dict[str, Any]:
+        """Fetch analyst target using Alpha Vantage overview data."""
+        if not self.api_key:
+            raise ProviderError("Alpha Vantage API key not configured")
+
+        params = {
+            "function": "OVERVIEW",
+            "symbol": symbol,
+            "apikey": self.api_key
+        }
+
+        data = await self.client.get("/query", params=params)
+
+        if not isinstance(data, dict) or not data:
+            raise ProviderError("Invalid Alpha Vantage overview response")
+
+        target_mean = _safe_float(data.get("AnalystTargetPrice"))
+        if target_mean is None:
+            raise ProviderError("Alpha Vantage target price unavailable")
+
+        return {
+            "symbol": symbol,
+            "target_high": None,
+            "target_low": None,
+            "target_mean": target_mean,
+            "target_median": None,
+            "last_updated": data.get("LatestQuarter"),
+            "source": "alpha_vantage",
+            "provider": "alpha_vantage"
+        }
+
+    async def fetch_estimates(self, symbol: str) -> Dict[str, Any]:
+        """Fetch EPS estimates using Alpha Vantage earnings endpoint."""
+        if not self.api_key:
+            raise ProviderError("Alpha Vantage API key not configured")
+
+        params = {
+            "function": "EARNINGS",
+            "symbol": symbol,
+            "apikey": self.api_key
+        }
+
+        data = await self.client.get("/query", params=params)
+
+        if not isinstance(data, dict):
+            raise ProviderError("Invalid Alpha Vantage earnings response")
+
+        quarterly = data.get("quarterlyEarnings") or []
+        if not quarterly:
+            raise ProviderError("Alpha Vantage returned no earnings data")
+
+        estimates: List[Dict[str, Any]] = []
+        for entry in quarterly[:8]:
+            estimates.append({
+                "date": entry.get("fiscalDateEnding"),
+                "reported_date": entry.get("reportedDate"),
+                "estimated_revenue": None,
+                "estimated_revenue_high": None,
+                "estimated_revenue_avg": None,
+                "estimated_eps": _safe_float(entry.get("estimatedEPS")),
+                "reported_eps": _safe_float(entry.get("reportedEPS")),
+                "estimated_ebitda": None,
+                "number_analysts": None
+            })
+
+        return {
+            "symbol": symbol,
+            "estimates": estimates,
+            "source": "alpha_vantage",
+            "provider": "alpha_vantage"
+        }
+
+
 # Module-level singleton fetchers to prevent socket leaks
 _finnhub_analyst_fetcher = FinnhubAnalystFetcher()
 _fmp_analyst_fetcher = FMPAnalystFetcher()
+_alpha_vantage_analyst_fetcher = AlphaVantageAnalystFetcher()
 
 
 # Initialize router for price targets
@@ -193,6 +292,15 @@ def _init_price_target_router():
             primary=True
         )
         logger.info("Finnhub registered as primary price target provider")
+
+    # Alpha Vantage fallback (mean target only)
+    alpha_key = os.getenv("ALPHAVANTAGE_API_KEY")
+    if alpha_key:
+        router.add_provider(
+            "alpha_vantage",
+            _alpha_vantage_analyst_fetcher.fetch_price_target
+        )
+        logger.info("Alpha Vantage registered as fallback price target provider")
 
     register_router("price_target", router)
     return router
@@ -295,6 +403,27 @@ async def mcp_analyst_estimates(symbol: str) -> Dict[str, Any]:
             result["truncated"] = True
 
         return result
+
+    except ProviderError as fmp_error:
+        logger.warning(
+            "FMP estimates unavailable for %s (%s) - attempting Alpha Vantage fallback",
+            symbol,
+            fmp_error
+        )
+        try:
+            fallback = await _alpha_vantage_analyst_fetcher.fetch_estimates(symbol)
+            fallback["fallback_from"] = "fmp"
+            return fallback
+        except Exception as fallback_error:
+            logger.error(
+                "Fallback estimates fetch failed for %s: %s",
+                symbol,
+                fallback_error
+            )
+            return {
+                "error": f"FMP and Alpha Vantage estimates failed: {fallback_error}",
+                "symbol": symbol
+            }
 
     except Exception as e:
         logger.error(f"Error fetching estimates for {symbol}: {e}")

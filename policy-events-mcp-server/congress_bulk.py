@@ -39,12 +39,20 @@ def get_current_congress():
 
 class CongressBulkClient:
     """Lightweight Congress.gov API client"""
-    
+
     BASE_URL = "https://api.congress.gov/v3"
-    
+
     def __init__(self):
         self.api_key = os.getenv("CONGRESS_API_KEY")
         self.session = None
+
+    def _validate_api_key(self):
+        """Validate that API key is configured"""
+        if not self.api_key:
+            raise ValueError(
+                "Missing CONGRESS_API_KEY environment variable. "
+                "Get your free API key at https://api.congress.gov/sign-up/"
+            )
         
     async def __aenter__(self):
         self.session = httpx.AsyncClient(timeout=30.0)
@@ -55,7 +63,7 @@ class CongressBulkClient:
             await self.session.aclose()
     
     async def get_recent_bills(
-        self, 
+        self,
         days_back: int = 30,
         max_results: int = 200
     ) -> List[Dict[str, Any]]:
@@ -63,9 +71,11 @@ class CongressBulkClient:
         Get all recent bills without filtering.
         Returns minimal metadata for LLM analysis.
         """
+        self._validate_api_key()
+
         if not self.session:
             self.session = httpx.AsyncClient(timeout=30.0)
-            
+
         bills = []
         
         # Calculate date range
@@ -106,11 +116,16 @@ class CongressBulkClient:
                 
             logger.info(f"Retrieved {len(bills)} bills from Congress.gov")
             
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error fetching bills: {e}")
+            raise ValueError(
+                f"Congress.gov API error: {e.response.status_code}. "
+                f"Verify your CONGRESS_API_KEY is valid at https://api.congress.gov/sign-up/"
+            )
         except Exception as e:
             logger.error(f"Error fetching bills: {e}")
-            # Return empty list on error - fail gracefully
-            return []
-            
+            raise ValueError(f"Failed to fetch bills from Congress.gov: {str(e)}")
+
         return bills[:max_results]
     
     async def get_upcoming_hearings(
@@ -122,9 +137,11 @@ class CongressBulkClient:
         Get all upcoming hearings without filtering.
         Returns minimal metadata for LLM analysis.
         """
+        self._validate_api_key()
+
         if not self.session:
             self.session = httpx.AsyncClient(timeout=30.0)
-            
+
         hearings = []
         
         # Get hearings from both chambers
@@ -175,9 +192,11 @@ class CongressBulkClient:
         """
         Get full details for specific bills identified by LLM.
         """
+        self._validate_api_key()
+
         if not self.session:
             self.session = httpx.AsyncClient(timeout=30.0)
-            
+
         detailed_bills = []
         
         for bill_id in bill_ids:
@@ -248,9 +267,11 @@ class CongressBulkClient:
         """
         Get full details for specific hearings identified by LLM.
         """
+        self._validate_api_key()
+
         if not self.session:
             self.session = httpx.AsyncClient(timeout=30.0)
-            
+
         detailed_hearings = []
         
         for event_id in event_ids:

@@ -4,11 +4,21 @@
 Expected Shortfall at 97.5% confidence must remain below 2.5%. This is NON-NEGOTIABLE.
 If ES > 2.5%, HALT all trading immediately.
 
+## Available Slash Commands
+
+The system provides three main workflows via custom slash commands:
+
+- **`/daily-check`** - Morning portfolio monitoring and risk assessment
+- **`/rebalance <allocation>`** - Full rebalancing with tax-loss harvesting (e.g., `/rebalance 80% equity / 20% bonds`)
+- **`/import-portfolio`** - Import broker CSV files into portfolio state
+
+These commands are defined in `.claude/commands/` and orchestrate specialized @-mention agents.
+
 ## Your Primary Role
 You are the workflow orchestrator. Your job is to:
 1. Import and manage portfolio state (structured data)
 2. Create and manage session folders
-3. Coordinate specialized agents
+3. Coordinate specialized agents via slash commands or direct @-mentions
 4. Generate free-form, context-aware analysis documents
 5. Ensure all agents write to the SAME session
 

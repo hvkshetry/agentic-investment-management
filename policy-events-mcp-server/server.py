@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import List, Dict, Any
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from pydantic import Field
 
 # Import our simple bulk clients
@@ -38,7 +39,7 @@ async def get_recent_bills(
     """
     Get all recent congressional bills without filtering.
     Returns minimal metadata for LLM to analyze and identify relevant ones.
-    
+
     Returns:
     - bill_id: Bill identifier (e.g., "HR-1234")
     - title: Bill title
@@ -47,10 +48,13 @@ async def get_recent_bills(
     - action_date: Date of latest action
     - url: Link to bill on Congress.gov
     """
-    async with congress_client:
-        bills = await congress_client.get_recent_bills(days_back, max_results)
-        logger.info(f"Returning {len(bills)} bills to LLM for analysis")
-        return bills
+    try:
+        async with congress_client:
+            bills = await congress_client.get_recent_bills(days_back, max_results)
+            logger.info(f"Returning {len(bills)} bills to LLM for analysis")
+            return bills
+    except ValueError as e:
+        raise ToolError(str(e))
 
 
 @mcp.tool()
@@ -62,7 +66,7 @@ async def get_federal_rules(
     """
     Get all Federal Register documents in date range without filtering.
     Returns minimal metadata for LLM to analyze and identify relevant ones.
-    
+
     Returns:
     - document_number: Federal Register document number
     - title: Document title
@@ -71,10 +75,13 @@ async def get_federal_rules(
     - publication_date: Date published
     - fr_url: Link to document on FederalRegister.gov
     """
-    async with govinfo_client:
-        rules = await govinfo_client.get_federal_rules(days_back, days_ahead, max_results)
-        logger.info(f"Returning {len(rules)} Federal Register documents to LLM for analysis")
-        return rules
+    try:
+        async with govinfo_client:
+            rules = await govinfo_client.get_federal_rules(days_back, days_ahead, max_results)
+            logger.info(f"Returning {len(rules)} Federal Register documents to LLM for analysis")
+            return rules
+    except ValueError as e:
+        raise ToolError(str(e))
 
 
 @mcp.tool()
@@ -85,7 +92,7 @@ async def get_upcoming_hearings(
     """
     Get all congressional hearings without filtering.
     Returns minimal metadata for LLM to analyze and identify relevant ones.
-    
+
     Returns:
     - event_id: Hearing event ID
     - chamber: House or Senate
@@ -94,10 +101,13 @@ async def get_upcoming_hearings(
     - date: Hearing date
     - url: Link to hearing on Congress.gov
     """
-    async with congress_client:
-        hearings = await congress_client.get_upcoming_hearings(days_ahead, max_results)
-        logger.info(f"Returning {len(hearings)} hearings to LLM for analysis")
-        return hearings
+    try:
+        async with congress_client:
+            hearings = await congress_client.get_upcoming_hearings(days_ahead, max_results)
+            logger.info(f"Returning {len(hearings)} hearings to LLM for analysis")
+            return hearings
+    except ValueError as e:
+        raise ToolError(str(e))
 
 
 @mcp.tool()
@@ -107,7 +117,7 @@ async def get_bill_details(
     """
     Get full details for specific bills identified by the LLM.
     Use this after analyzing results from get_recent_bills.
-    
+
     Returns detailed information including:
     - Full title and summary
     - Sponsor and cosponsors
@@ -116,10 +126,13 @@ async def get_bill_details(
     - Text versions available
     - Direct link to Congress.gov
     """
-    async with congress_client:
-        details = await congress_client.get_bill_details(bill_ids)
-        logger.info(f"Retrieved details for {len(details)} bills")
-        return details
+    try:
+        async with congress_client:
+            details = await congress_client.get_bill_details(bill_ids)
+            logger.info(f"Retrieved details for {len(details)} bills")
+            return details
+    except ValueError as e:
+        raise ToolError(str(e))
 
 
 @mcp.tool()
@@ -129,7 +142,7 @@ async def get_rule_details(
     """
     Get full details for specific Federal Register documents identified by the LLM.
     Use this after analyzing results from get_federal_rules.
-    
+
     Returns detailed information including:
     - Full title and summary
     - Agency and rule type
@@ -138,10 +151,13 @@ async def get_rule_details(
     - Individual documents (granules) in the package
     - Links to PDF and text versions
     """
-    async with govinfo_client:
-        details = await govinfo_client.get_rule_details(document_numbers)
-        logger.info(f"Retrieved details for {len(details)} Federal Register documents")
-        return details
+    try:
+        async with govinfo_client:
+            details = await govinfo_client.get_rule_details(document_numbers)
+            logger.info(f"Retrieved details for {len(details)} Federal Register documents")
+            return details
+    except ValueError as e:
+        raise ToolError(str(e))
 
 
 @mcp.tool()
@@ -151,7 +167,7 @@ async def get_hearing_details(
     """
     Get full details for specific hearings identified by the LLM.
     Use this after analyzing results from get_upcoming_hearings.
-    
+
     Returns detailed information including:
     - Full title and type
     - Committee information
@@ -159,10 +175,13 @@ async def get_hearing_details(
     - Available documents
     - Direct link to Congress.gov
     """
-    async with congress_client:
-        details = await congress_client.get_hearing_details(event_ids)
-        logger.info(f"Retrieved details for {len(details)} hearings")
-        return details
+    try:
+        async with congress_client:
+            details = await congress_client.get_hearing_details(event_ids)
+            logger.info(f"Retrieved details for {len(details)} hearings")
+            return details
+    except ValueError as e:
+        raise ToolError(str(e))
 
 
 if __name__ == "__main__":

@@ -5,9 +5,11 @@ Provides macroeconomic indicators using free providers:
 - IMF IFS/WEO APIs (no key required)
 """
 
+import json
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 from datetime import datetime
+from importlib import resources
 
 from shared.http_client import BaseHTTPTool, ProviderError
 
@@ -116,6 +118,7 @@ class IMFFetcher:
             timeout=30.0,
             cache_ttl=3600
         )
+        self._country_map = self._load_iso_maps()
 
     async def fetch_series(
         self,
@@ -142,21 +145,32 @@ class IMFFetcher:
             # Extract values for requested countries
             values_data = data.get("values", {}).get(indicator, {})
 
+            allowed_countries: Optional[Set[str]] = None
+            if countries:
+                allowed_countries = self._normalize_country_codes(countries)
+
             series = []
             for country_code, country_data in values_data.items():
                 # Filter by requested countries if specified
-                if countries and country_code not in [c.upper() for c in countries]:
+                if allowed_countries is not None and country_code.upper() not in allowed_countries:
                     continue
 
                 for year, value in country_data.items():
                     if value is not None:
                         try:
-                            series.append({
+                            entry = {
                                 "country_code": country_code,
                                 "year": int(year),
                                 "value": float(value),
                                 "indicator": indicator
-                            })
+                            }
+
+                            country_info = self._country_map.get("iso3_to_info", {}).get(country_code.upper())
+                            if country_info:
+                                entry.setdefault("country", country_info["name"])
+                                entry.setdefault("iso2", country_info.get("iso2"))
+
+                            series.append(entry)
                         except (ValueError, TypeError):
                             continue
 
@@ -175,6 +189,100 @@ class IMFFetcher:
         except Exception as e:
             logger.error(f"IMF fetch failed for {indicator}: {e}")
             raise ProviderError(f"IMF error: {e}")
+
+    def _load_iso_maps(self) -> Dict[str, Dict[str, Any]]:
+        """Load helper maps for ISO code normalization."""
+        iso2_to_name: Dict[str, str] = {}
+        iso3_to_info: Dict[str, Dict[str, Any]] = {}
+        iso2_to_iso3: Dict[str, str] = {}
+
+        try:
+            with resources.files("openbb_imf.assets").joinpath("imf_country_map.json").open(
+                "r", encoding="utf-8"
+            ) as handle:
+                iso2_to_name = json.load(handle)
+        except Exception as exc:
+            logger.warning(f"Failed to load IMF ISO2 country map: {exc}")
+
+        try:
+            from openbb_imf.utils.constants import PORT_COUNTRIES  # type: ignore
+
+            # Build reverse map name -> ISO3
+            name_to_iso3 = {name.upper(): code.upper() for name, code in PORT_COUNTRIES.items()}
+
+            for iso2, name in iso2_to_name.items():
+                iso3 = name_to_iso3.get(name.upper())
+                if iso3:
+                    iso3_to_info[iso3] = {
+                        "iso2": iso2.upper(),
+                        "name": name
+                    }
+                    iso2_to_iso3[iso2.upper()] = iso3
+
+            # Ensure ISO3 info is available for direct entries as well
+            for name, iso3 in PORT_COUNTRIES.items():
+                iso3 = iso3.upper()
+                iso3_to_info.setdefault(iso3, {
+                    "iso2": None,
+                    "name": name
+                })
+
+        except Exception as exc:  # pragma: no cover - best effort enrichment
+            logger.warning(f"Failed to build ISO3 enrichment map: {exc}")
+
+        return {
+            "iso2_to_name": {k.upper(): v for k, v in iso2_to_name.items()},
+            "iso3_to_info": iso3_to_info,
+            "iso2_to_iso3": iso2_to_iso3
+        }
+
+    def _normalize_country_codes(self, countries: List[str]) -> Set[str]:
+        """Normalize requested codes to ISO3 as used by IMF datasets."""
+        normalized: Set[str] = set()
+        iso2_map = self._country_map.get("iso2_to_name", {})
+        iso3_info = self._country_map.get("iso3_to_info", {})
+        iso2_to_iso3 = self._country_map.get("iso2_to_iso3", {})
+
+        for country in countries:
+            if not country:
+                continue
+
+            code = country.upper()
+
+            # Already ISO3
+            if len(code) == 3 and code in iso3_info:
+                normalized.add(code)
+                continue
+
+            # ISO2 -> ISO3 using lookup
+            iso3 = iso2_to_iso3.get(code)
+            if iso3:
+                normalized.add(iso3)
+                continue
+
+            name = iso2_map.get(code)
+            if name:
+                info = next(
+                    (iso for iso, data in iso3_info.items() if data.get("name", "").upper() == name.upper()),
+                    None
+                )
+                if info:
+                    normalized.add(info)
+                    continue
+
+            # Try using country name direct match
+            info = next(
+                (iso for iso, data in iso3_info.items() if data.get("name", "").upper() == code),
+                None
+            )
+            if info:
+                normalized.add(info)
+                continue
+
+            # Accept raw code (aggregates or already ISO3 but unknown to map)
+            normalized.add(code)
+
+        return normalized
 
 
 # Module-level singleton fetchers to prevent socket leaks
