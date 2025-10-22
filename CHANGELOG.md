@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-10-21
+
+### Changed
+- **Tax Server Refactor**: Replaced tenforty with PolicyEngine-US for individual (Form 1040) tax calculations
+- **MA Tax Rates**: Massachusetts STCG rate updated to 8.5% (2024+) from incorrect 12%, sourced from PolicyEngine parameter system
+- **Trust Tax Logic**: Enhanced grantor trust handling to prevent double taxation
+- **Form 1041 Calculations**: Improved trust and estate tax calculations with proper DNI handling
+
+### Added
+- PolicyEngine-US integration for accurate, actively-maintained individual tax calculations
+- Grantor trust logic with pass-through taxation to prevent double taxation
+- PolicyEngine parameter system integration for authoritative state tax rates
+- AGPL-3.0 license compliance for PolicyEngine dependency
+
+### Security
+- AGPL-3.0 license notice added to tax server and NOTICE file
+- Enhanced tax calculation accuracy through PolicyEngine's authoritative data
+
 ## [2.1.0] - 2025-01-18
 
 ### Added

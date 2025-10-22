@@ -69,7 +69,7 @@ If extracting from another tool's output, convert strings to native types first.
 - ALWAYS call `mcp__portfolio-state-server__get_portfolio_state` for actual holdings
 - ALWAYS call `mcp__tax-optimization-server__find_tax_loss_harvesting_pairs` for actual losses
 - NEVER fabricate tax loss numbers (e.g., $75k, $125k template values)
-- Tax rates MUST come from tenforty library via MCP tools
+- Tax rates MUST come from PolicyEngine-US (individuals) or custom calculations (trusts) via MCP tools
 - If Oracle is unavailable, FAIL LOUDLY - do not provide fallback estimates
 
 ## Core Capabilities
@@ -175,7 +175,7 @@ Single comprehensive tool handles ALL tax scenarios:
 - **LTCG**: 0%/15%/20% based on income
 - **STCG**: Ordinary rates
 - **NIIT**: 3.8% on investment income (>$200K single, >$250K MFJ)
-- **MA Specifics**: 12% on STCG, 5% on LTCG
+- **MA Specifics**: 8.5% on STCG (2024+), 5% on LTCG (rates from PolicyEngine parameter system)
 
 ### Critical Rules
 - **Wash Sale**: 30 days before/after

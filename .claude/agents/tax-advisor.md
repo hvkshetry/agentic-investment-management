@@ -135,7 +135,7 @@ If extracting from another tool's output, convert strings to native types first.
 - ALWAYS call `mcp__portfolio-state-server__get_portfolio_state` for actual holdings
 - ALWAYS call `mcp__tax-optimization-server__find_tax_loss_harvesting_pairs` for actual losses
 - NEVER fabricate tax loss numbers (e.g., $75k, $125k template values)
-- Tax rates MUST come from tenforty library via MCP tools
+- Tax rates MUST come from PolicyEngine-US (individuals) or custom calculations (trusts) via MCP tools
 - If Oracle is unavailable, FAIL LOUDLY - do not provide fallback estimates
 
 ## Core Capabilities
@@ -145,7 +145,7 @@ If extracting from another tool's output, convert strings to native types first.
 - Federal and state tax calculations (all filing statuses)
 - Capital gains optimization (STCG/LTCG with NIIT)
 - Trust tax calculations with compressed brackets
-- State-specific rules (MA 12% STCG, CA 13.3%)
+- State-specific rules (MA 8.5% STCG (2024+), CA 13.3%) - rates from PolicyEngine parameter system
 - Tax loss harvesting with wash sale prevention
 - AMT analysis and quarterly estimates
 - Multi-period tax-aware rebalancing schedules

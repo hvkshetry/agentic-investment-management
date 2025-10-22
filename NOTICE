@@ -32,13 +32,19 @@ THIRD-PARTY COMPONENTS
    License: BSD 3-Clause License
    Usage: Advanced risk measures and optimization methods
 
-4. OPENBB PLATFORM
+4. POLICYENGINE-US
+   Source: https://github.com/PolicyEngine/policyengine-us
+   License: AGPL-3.0
+   Usage: Individual (Form 1040) tax calculations with authoritative parameter system
+   Note: Distributed as dependency in tax-mcp-server, requires AGPL-3.0 compliance
+
+5. OPENBB PLATFORM
    Source: https://github.com/OpenBB-finance/OpenBB
    License: AGPL-3.0 (Community Edition)
    Usage: Market data access and financial analytics
    Note: Used via API/SDK, not distributed with this software
 
-5. MODEL CONTEXT PROTOCOL (MCP)
+6. MODEL CONTEXT PROTOCOL (MCP)
    Source: https://modelcontextprotocol.io
    License: MIT License
    Copyright: Anthropic
@@ -59,8 +65,12 @@ This software interfaces with but does not distribute:
 IMPORTANT LICENSING NOTES
 ===========================================================================
 
-Due to the inclusion of the GPL-3.0 licensed Oracle component from Double
-Finance, this entire project is licensed under GPL-3.0. This means:
+Due to the inclusion of:
+1. GPL-3.0 licensed Oracle component from Double Finance
+2. AGPL-3.0 licensed PolicyEngine-US for tax calculations
+
+This entire project is licensed under GPL-3.0 (the more restrictive of GPL/AGPL).
+This means:
 
 1. Any distribution of this software must include source code
 2. Modifications must also be released under GPL-3.0

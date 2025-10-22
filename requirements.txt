@@ -35,7 +35,9 @@ statsmodels>=0.14.0           # Statistical tests (ADF, time series)
 # =============================================================================
 # Tax Calculations
 # =============================================================================
-tenforty>=2024.0.0            # Federal and state tax calculations
+policyengine-us>=1.424.0      # Individual tax calculations (AGPL-3.0)
+policyengine-core>=3.20.0     # PolicyEngine framework (AGPL-3.0)
+tenforty>=2024.0.0            # Trust/estate tax calculations (MIT)
 
 # =============================================================================
 # Performance Analytics
