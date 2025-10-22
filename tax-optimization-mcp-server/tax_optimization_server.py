@@ -72,11 +72,33 @@ def get_tax_lots_by_symbol(portfolio_state):
     
     return tax_lots_by_symbol
 
+def get_helpful_portfolio_missing_error():
+    """Generate a helpful error message when portfolio state is missing"""
+    default_path = os.path.join(os.path.dirname(__file__), '..', 'portfolio-state-mcp-server', 'state', 'portfolio_state.json')
+    state_file = os.getenv('PORTFOLIO_STATE_PATH', default_path)
+
+    return {
+        "error": "Portfolio state not found",
+        "details": f"No portfolio data file found at: {state_file}",
+        "possible_causes": [
+            "Portfolio has not been imported yet",
+            "Portfolio state file was deleted or moved",
+            "PORTFOLIO_STATE_PATH environment variable points to wrong location"
+        ],
+        "suggested_actions": [
+            "Import portfolio data using: /import-portfolio command",
+            "Or use portfolio-state-server to import broker CSV",
+            "Or verify PORTFOLIO_STATE_PATH environment variable"
+        ],
+        "next_steps": "Run '/import-portfolio' to import your portfolio from a broker CSV file",
+        "confidence": 0.0
+    }
+
 async def get_portfolio_state():
     """Read portfolio state directly from JSON file with calculated fields"""
     import json
     from datetime import datetime
-    
+
     try:
         # Read the portfolio state file - use environment variable or relative path
         default_path = os.path.join(os.path.dirname(__file__), '..', 'portfolio-state-mcp-server', 'state', 'portfolio_state.json')
@@ -84,24 +106,24 @@ async def get_portfolio_state():
 
         with open(state_file, 'r') as f:
             data = json.load(f)
-        
+
         # Calculate enriched fields if not present
         if 'total_value' not in data:
             data['total_value'] = sum(p.get('current_value', 0) for p in data.get('positions', []))
-        
+
         if 'total_unrealized_gain' not in data:
             total_unrealized = 0
             for position in data.get('positions', []):
                 if 'unrealized_gain' in position:
                     total_unrealized += position['unrealized_gain']
             data['total_unrealized_gain'] = total_unrealized
-        
+
         # Add confidence score for compatibility
         data['confidence'] = 0.95
-        
+
         logger.info(f"Successfully loaded portfolio state with {len(data.get('positions', []))} positions")
         return data
-            
+
     except FileNotFoundError:
         logger.error(f"Portfolio state file not found at expected location")
         return None
@@ -243,12 +265,9 @@ async def optimize_portfolio_for_taxes(
         
         # Get portfolio state
         portfolio_state = await get_portfolio_state()
-        
+
         if not portfolio_state:
-            return {
-                "error": "Unable to read portfolio state",
-                "confidence": 0.0
-            }
+            return get_helpful_portfolio_missing_error()
         
         # Get tax lots grouped by symbol
         tax_lots_by_symbol = get_tax_lots_by_symbol(portfolio_state)
@@ -540,12 +559,9 @@ async def find_tax_loss_harvesting_pairs(
     try:
         # Get portfolio state
         portfolio_state = await get_portfolio_state()
-        
+
         if not portfolio_state:
-            return {
-                "error": "Unable to read portfolio state",
-                "confidence": 0.0
-            }
+            return get_helpful_portfolio_missing_error()
         
         # Find positions with losses
         loss_positions = []
@@ -721,12 +737,9 @@ async def simulate_withdrawal_tax_impact(
     try:
         # Get portfolio state
         portfolio_state = await get_portfolio_state()
-        
+
         if not portfolio_state:
-            return {
-                "error": "Unable to read portfolio state",
-                "confidence": 0.0
-            }
+            return get_helpful_portfolio_missing_error()
         
         # Calculate total portfolio value using PortfolioValueService
         total_value = portfolio_value_service.get_portfolio_total_value(portfolio_state)

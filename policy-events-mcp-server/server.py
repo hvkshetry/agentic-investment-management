@@ -34,7 +34,7 @@ govinfo_client = GovInfoBulkClient()
 @mcp.tool()
 async def get_recent_bills(
     days_back: int = Field(30, description="Number of days to look back"),
-    max_results: int = Field(200, description="Maximum number of results to return")
+    limit: int = Field(200, description="Maximum number of results to return")
 ) -> List[Dict[str, Any]]:
     """
     Get all recent congressional bills without filtering.
@@ -50,7 +50,7 @@ async def get_recent_bills(
     """
     try:
         async with congress_client:
-            bills = await congress_client.get_recent_bills(days_back, max_results)
+            bills = await congress_client.get_recent_bills(days_back, limit)
             logger.info(f"Returning {len(bills)} bills to LLM for analysis")
             return bills
     except ValueError as e:
@@ -61,7 +61,7 @@ async def get_recent_bills(
 async def get_federal_rules(
     days_back: int = Field(30, description="Days to look back"),
     days_ahead: int = Field(30, description="Days to look ahead"),
-    max_results: int = Field(200, description="Maximum number of results")
+    limit: int = Field(200, description="Maximum number of results")
 ) -> List[Dict[str, Any]]:
     """
     Get all Federal Register documents in date range without filtering.
@@ -77,7 +77,7 @@ async def get_federal_rules(
     """
     try:
         async with govinfo_client:
-            rules = await govinfo_client.get_federal_rules(days_back, days_ahead, max_results)
+            rules = await govinfo_client.get_federal_rules(days_back, days_ahead, limit)
             logger.info(f"Returning {len(rules)} Federal Register documents to LLM for analysis")
             return rules
     except ValueError as e:
@@ -87,7 +87,7 @@ async def get_federal_rules(
 @mcp.tool()
 async def get_upcoming_hearings(
     days_ahead: int = Field(30, description="Days to look ahead"),
-    max_results: int = Field(100, description="Maximum number of results")
+    limit: int = Field(100, description="Maximum number of results")
 ) -> List[Dict[str, Any]]:
     """
     Get all congressional hearings without filtering.
@@ -103,7 +103,7 @@ async def get_upcoming_hearings(
     """
     try:
         async with congress_client:
-            hearings = await congress_client.get_upcoming_hearings(days_ahead, max_results)
+            hearings = await congress_client.get_upcoming_hearings(days_ahead, limit)
             logger.info(f"Returning {len(hearings)} hearings to LLM for analysis")
             return hearings
     except ValueError as e:
