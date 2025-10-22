@@ -3,6 +3,10 @@
 Tax MCP Server v2 - Enhanced with NIIT, Trust Taxes, and State-Specific Rules
 Addresses all tax deficiencies from ~/investing/feedback.md
 Consolidated into single comprehensive tax analysis tool
+
+AGPL-3.0 License Notice:
+This software uses PolicyEngine-US (AGPL-3.0) for individual tax calculations.
+Any distribution or network service must comply with AGPL-3.0 terms.
 """
 
 from fastmcp import FastMCP
@@ -11,7 +15,8 @@ import logging
 import sys
 import os
 from datetime import datetime
-import tenforty
+from policyengine_us import Simulation
+from policyengine_us.system import system as pe_system
 
 # Add shared modules to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
@@ -188,8 +193,10 @@ async def calculate_comprehensive_tax(
                           f"LT: ${long_term_gains:,.2f}, ST: ${short_term_gains:,.2f}")
                 
             except Exception as e:
-                logger.error(f"Failed to fetch from Portfolio State: {e}")
-                raise ValueError(f"Portfolio State required but failed: {e}")
+                logger.warning(f"Failed to fetch from Portfolio State: {e}")
+                logger.warning("Continuing with user-provided capital gains (if any). Portfolio-derived gains unavailable.")
+                portfolio_source = "unavailable (Portfolio State error)"
+                # Don't raise - allow tax calculation to proceed with user-provided data or zeros
         
         # Initialize result structure
         result = {
@@ -209,27 +216,25 @@ async def calculate_comprehensive_tax(
         # =========================
         # 1. CALCULATE BASE TAXES
         # =========================
-        
+
         if entity_type == "individual":
-            # Use tenforty for individual calculation
-            base_result = tenforty.evaluate_return(
-                year=tax_year,
-                state=state,
+            # Use PolicyEngine for individual calculation (replaces tenforty)
+            pe_result = calculate_individual_tax_policyengine(
+                tax_year=tax_year,
                 filing_status=filing_status,
-                num_dependents=dependents,
-                w2_income=income_sources.get('w2_income', 0),
-                taxable_interest=income_sources.get('taxable_interest', 0),
-                qualified_dividends=income_sources.get('qualified_dividends', 0),
-                ordinary_dividends=income_sources.get('ordinary_dividends', 0),
-                short_term_capital_gains=income_sources.get('short_term_capital_gains', 0),
-                long_term_capital_gains=income_sources.get('long_term_capital_gains', 0),
-                incentive_stock_option_gains=income_sources.get('iso_gains', 0),
-                itemized_deductions=deductions.get('itemized_deductions', 0)
+                state=state,
+                income_sources=income_sources,
+                deductions=deductions,
+                dependents=dependents
             )
-            
-            federal_tax = base_result.federal_total_tax
-            state_tax = base_result.state_total_tax if base_result.state_total_tax else 0
-            agi = base_result.federal_adjusted_gross_income
+
+            federal_tax = pe_result["federal_tax"]
+            state_tax = pe_result["state_tax"]
+            agi = pe_result["agi"]
+
+            # PolicyEngine already calculates NIIT, so extract it
+            niit_from_pe = pe_result.get("niit", 0)
+            amt_from_pe = pe_result.get("amt", 0)
             
         elif entity_type in ["trust", "estate"]:
             # Calculate trust/estate taxes
@@ -250,80 +255,97 @@ async def calculate_comprehensive_tax(
         # =========================
         # 2. CALCULATE NIIT (3.8% SURTAX)
         # =========================
-        
+
         if include_niit:
-            # Calculate Modified Adjusted Gross Income (MAGI)
-            magi = agi + income_sources.get('tax_exempt_interest', 0)
-            
-            # Net Investment Income components
-            net_investment_income = (
-                income_sources.get('taxable_interest', 0) +
-                income_sources.get('ordinary_dividends', 0) +
-                income_sources.get('qualified_dividends', 0) +
-                income_sources.get('short_term_capital_gains', 0) +
-                income_sources.get('long_term_capital_gains', 0) +
-                income_sources.get('rental_income', 0) +
-                income_sources.get('passive_income', 0) -
-                deductions.get('investment_expenses', 0)
-            )
-            
-            # NIIT thresholds
-            niit_thresholds = {
-                'Single': 200000,
-                'Married Filing Jointly': 250000,
-                'Married Filing Separately': 125000,
-                'Head of Household': 200000,
-                'trust': 15200  # 2024 trust threshold (much lower!)
-            }
-            
-            threshold = niit_thresholds.get(filing_status if entity_type == 'individual' else 'trust', 200000)
-            
-            # Calculate NIIT
-            if magi > threshold:
-                excess_magi = magi - threshold
-                niit_base = min(net_investment_income, excess_magi)
-                niit_tax = niit_base * 0.038
-            else:
-                niit_tax = 0
-                niit_base = 0
-            
-            result["niit_calculation"] = {
-                "magi": float(magi),
-                "threshold": float(threshold),
-                "excess_magi": float(max(0, magi - threshold)),
-                "net_investment_income": float(net_investment_income),
-                "niit_base": float(niit_base),
-                "niit_tax": float(niit_tax),
-                "effective_niit_rate": float(niit_tax / magi * 100) if magi > 0 else 0
-            }
-            
-            federal_tax += niit_tax
+            if entity_type == "individual":
+                # For individuals, PolicyEngine already calculated NIIT
+                niit_tax = niit_from_pe
+                magi = agi + income_sources.get('tax_exempt_interest', 0)
+
+                # Get threshold for reporting
+                niit_thresholds = {
+                    'Single': 200000,
+                    'Married Filing Jointly': 250000,
+                    'Married Filing Separately': 125000,
+                    'Head of Household': 200000
+                }
+                threshold = niit_thresholds.get(filing_status, 200000)
+
+                result["niit_calculation"] = {
+                    "magi": float(magi),
+                    "threshold": float(threshold),
+                    "niit_tax": float(niit_tax),
+                    "effective_niit_rate": float(niit_tax / magi * 100) if magi > 0 else 0,
+                    "source": "PolicyEngine calculation"
+                }
+
+                # NIIT already included in PolicyEngine's federal_tax
+                # No need to add it again
+
+            elif entity_type in ["trust", "estate"]:
+                # For trusts, calculate NIIT manually (not in PolicyEngine)
+                magi = agi + income_sources.get('tax_exempt_interest', 0)
+
+                # Net Investment Income components
+                net_investment_income = (
+                    income_sources.get('taxable_interest', 0) +
+                    income_sources.get('ordinary_dividends', 0) +
+                    income_sources.get('qualified_dividends', 0) +
+                    income_sources.get('short_term_capital_gains', 0) +
+                    income_sources.get('long_term_capital_gains', 0) +
+                    income_sources.get('rental_income', 0) +
+                    income_sources.get('passive_income', 0) -
+                    deductions.get('investment_expenses', 0)
+                )
+
+                # Trust NIIT threshold (much lower!)
+                threshold = 15200  # 2024 trust threshold
+
+                # Calculate NIIT
+                if magi > threshold:
+                    excess_magi = magi - threshold
+                    niit_base = min(net_investment_income, excess_magi)
+                    niit_tax = niit_base * 0.038
+                else:
+                    niit_tax = 0
+                    niit_base = 0
+
+                result["niit_calculation"] = {
+                    "magi": float(magi),
+                    "threshold": float(threshold),
+                    "excess_magi": float(max(0, magi - threshold)),
+                    "net_investment_income": float(net_investment_income),
+                    "niit_base": float(niit_base),
+                    "niit_tax": float(niit_tax),
+                    "effective_niit_rate": float(niit_tax / magi * 100) if magi > 0 else 0,
+                    "source": "Custom trust calculation"
+                }
+
+                federal_tax += niit_tax
         
         # =========================
         # 3. MASSACHUSETTS STATE TAX SPECIFICS
         # =========================
         
         if state == "MA":
-            ma_tax = calculate_massachusetts_tax(income_sources, entity_type)
+            ma_tax = calculate_massachusetts_tax(income_sources, entity_type, tax_year)
             state_tax = ma_tax["total_ma_tax"]
             result["state_tax"]["massachusetts_detail"] = ma_tax
         
         # =========================
         # 4. AMT CALCULATION
         # =========================
-        
+
         if include_amt and entity_type == "individual":
-            # AMT calculation (simplified - tenforty handles most of it)
-            if hasattr(base_result, 'federal_amt'):
-                amt = base_result.federal_amt
-                result["amt_calculation"] = {
-                    "amt_income": float(agi + income_sources.get('iso_gains', 0)),
-                    "amt_exemption": get_amt_exemption(filing_status, agi, tax_year),
-                    "tentative_amt": float(amt),
-                    "regular_tax": float(federal_tax - amt),
-                    "amt_owed": float(max(0, amt)),
-                    "is_amt_liable": amt > 0
-                }
+            # For individuals, PolicyEngine already calculated AMT
+            amt = amt_from_pe
+            result["amt_calculation"] = {
+                "amt_owed": float(amt),
+                "is_amt_liable": amt > 0,
+                "source": "PolicyEngine calculation"
+            }
+            # AMT already included in PolicyEngine's federal_tax
+            # No need to add it again
         
         # =========================
         # 5. TOTAL TAX CALCULATION
@@ -669,21 +691,183 @@ async def calculate_comprehensive_tax(
                 "trust_tax": entity_type == "trust",
                 "state_specific": state is not None
             },
-            "tax_engine": "tenforty + custom calculations"
+            "tax_engine": "PolicyEngine-US (individuals) + custom calculations (trusts)" if entity_type == "individual" else "Custom trust calculations"
         }
         
         return result
-        
+
     except Exception as e:
         logger.error(f"Comprehensive tax calculation failed: {str(e)}")
         raise ValueError(f"Tax calculation failed: {str(e)}")
+
+
+def calculate_individual_tax_policyengine(
+    tax_year: int,
+    filing_status: str,
+    state: str,
+    income_sources: Dict[str, float],
+    deductions: Dict[str, float],
+    dependents: int
+) -> Dict[str, Any]:
+    """
+    Calculate individual (Form 1040) taxes using PolicyEngine-US.
+    Replaces tenforty with more accurate, actively maintained library.
+
+    Args:
+        tax_year: Tax year (2018-2025)
+        filing_status: 'Single', 'Married Filing Jointly', etc.
+        state: Two-letter state code (e.g., 'MA', 'CA', 'NY')
+        income_sources: Dictionary of income types
+        deductions: Dictionary of deduction types
+        dependents: Number of dependents
+
+    Returns:
+        Dictionary with federal_tax, state_tax, agi, and detailed breakdown
+    """
+
+    # Map filing status to PolicyEngine format
+    filing_status_map = {
+        "Single": "SINGLE",
+        "Married Filing Jointly": "JOINT",
+        "Married/Joint": "JOINT",
+        "Married Filing Separately": "SEPARATE",
+        "Married/Separate": "SEPARATE",
+        "Head of Household": "HEAD_OF_HOUSEHOLD",
+        "Surviving Spouse": "SURVIVING_SPOUSE"
+    }
+
+    pe_filing_status = filing_status_map.get(filing_status, "SINGLE")
+
+    # Build PolicyEngine household structure
+    # PolicyEngine uses a hierarchical structure: household -> tax_unit -> person
+    situation = {
+        "people": {
+            "person": {
+                "age": {tax_year: 40},  # Default adult age
+                "employment_income": {tax_year: income_sources.get('w2_income', 0)},
+                "taxable_interest_income": {tax_year: income_sources.get('taxable_interest', 0)},
+                "tax_exempt_interest_income": {tax_year: income_sources.get('tax_exempt_interest', 0)},
+                "qualified_dividend_income": {tax_year: income_sources.get('qualified_dividends', 0)},
+                "non_qualified_dividend_income": {tax_year: income_sources.get('ordinary_dividends', 0)},
+                "short_term_capital_gains": {tax_year: income_sources.get('short_term_capital_gains', 0)},
+                "long_term_capital_gains": {tax_year: income_sources.get('long_term_capital_gains', 0)},
+                "self_employment_income": {tax_year: income_sources.get('business_income', 0)},
+                "rental_income": {tax_year: income_sources.get('rental_income', 0)},
+                "partnership_s_corp_income": {tax_year: income_sources.get('passive_income', 0)},
+                "taxable_ira_distributions": {tax_year: income_sources.get('retirement_distributions', 0)},
+            }
+        },
+        "tax_units": {
+            "tax_unit": {
+                "members": ["person"],
+                "filing_status": {tax_year: pe_filing_status},
+                # Note: PolicyEngine calculates itemized vs standard automatically
+                # We can't directly set itemized_deductions amount
+            }
+        },
+        "spm_units": {
+            "spm_unit": {
+                "members": ["person"]
+            }
+        },
+        "households": {
+            "household": {
+                "members": ["person"],
+                "state_name": {tax_year: state if state else "MA"}  # Default to MA if no state
+            }
+        }
+    }
+
+    # Add dependents if specified
+    if dependents > 0:
+        for i in range(dependents):
+            person_id = f"dependent_{i+1}"
+            situation["people"][person_id] = {
+                "age": {tax_year: 10}  # Default child age
+            }
+            situation["tax_units"]["tax_unit"]["members"].append(person_id)
+            situation["spm_units"]["spm_unit"]["members"].append(person_id)
+            situation["households"]["household"]["members"].append(person_id)
+
+    # Create simulation
+    simulation = Simulation(situation=situation)
+
+    # Extract results
+    federal_income_tax = simulation.calculate("income_tax", tax_year)[0]
+    state_income_tax = simulation.calculate("state_income_tax", tax_year)[0] if state else 0
+    agi = simulation.calculate("adjusted_gross_income", tax_year)[0]
+
+    # Get detailed breakdown - only use variables that exist
+    result = {
+        "federal_tax": float(federal_income_tax),
+        "state_tax": float(state_income_tax),
+        "agi": float(agi),
+        "taxable_income": float(simulation.calculate("taxable_income", tax_year)[0]),
+        "standard_deduction": float(simulation.calculate("standard_deduction", tax_year)[0]),
+    }
+
+    # Try to add optional fields that may not always exist
+    try:
+        result["niit"] = float(simulation.calculate("net_investment_income_tax", tax_year)[0])
+    except:
+        result["niit"] = 0
+
+    try:
+        result["amt"] = float(simulation.calculate("alternative_minimum_tax", tax_year)[0])
+    except:
+        result["amt"] = 0
+
+    try:
+        result["capital_gains_tax"] = float(simulation.calculate("capital_gains_tax", tax_year)[0])
+    except:
+        result["capital_gains_tax"] = 0
+
+    try:
+        if income_sources.get('business_income', 0) > 0:
+            result["self_employment_tax"] = float(simulation.calculate("self_employment_tax", tax_year)[0])
+        else:
+            result["self_employment_tax"] = 0
+    except:
+        result["self_employment_tax"] = 0
+
+    # Add state-specific details if available
+    if state:
+        try:
+            result["state_agi"] = float(simulation.calculate("state_agi", tax_year)[0])
+        except:
+            pass
+
+    return result
 
 
 def calculate_trust_tax(trust_income: float, trust_details: Dict, tax_year: int) -> Dict[str, float]:
     """
     Calculate federal trust tax with compressed brackets.
     Trusts hit top rate at ~$15,200 vs $609,350 for individuals!
+
+    IMPORTANT: Grantor trusts are pass-through entities. All income is taxed to the
+    grantor on their personal Form 1040, NOT on the trust's Form 1041.
+    This function returns $0 tax for grantor trusts to prevent double taxation.
     """
+    # Check if this is a grantor trust
+    trust_type = trust_details.get('trust_type', 'complex')
+    is_grantor_trust = trust_type.lower() == 'grantor'
+
+    if is_grantor_trust:
+        # Grantor trust: all income passes through to grantor's Form 1040
+        # Trust pays $0 tax to prevent double taxation
+        return {
+            "trust_income": float(trust_income),
+            "dni": float(trust_income),
+            "distributions": 0.0,
+            "trust_taxable_income": 0.0,
+            "federal_tax": 0.0,
+            "effective_rate": 0.0,
+            "is_grantor_trust": True,
+            "note": "Grantor trust: All income taxed to grantor on Form 1040. Trust pays $0 tax to prevent double taxation."
+        }
+
+    # Non-grantor trust: calculate tax normally
     # 2024 trust tax brackets (compressed)
     trust_brackets = [
         (3150, 0.10),
@@ -691,11 +875,11 @@ def calculate_trust_tax(trust_income: float, trust_details: Dict, tax_year: int)
         (15200, 0.35),
         (float('inf'), 0.37)
     ]
-    
+
     # Distributable Net Income (DNI)
     dni = trust_details.get('distributable_net_income', trust_income)
     distributions = trust_details.get('distributions_to_beneficiaries', 0)
-    
+
     # Trust keeps income not distributed
     trust_taxable_income = max(0, dni - distributions)
     
@@ -719,19 +903,36 @@ def calculate_trust_tax(trust_income: float, trust_details: Dict, tax_year: int)
         "federal_tax": float(tax),
         "effective_rate": float(tax / trust_income * 100) if trust_income > 0 else 0,
         "top_rate_threshold": 15200,
-        "note": "Trusts reach 37% rate at $15,200 vs $609,350 for individuals"
+        "is_grantor_trust": False,
+        "trust_type": trust_type,
+        "note": "Non-grantor trust: Trusts reach 37% rate at $15,200 vs $609,350 for individuals"
     }
 
 
-def calculate_massachusetts_tax(income_sources: Dict[str, float], entity_type: str) -> Dict[str, float]:
+def calculate_massachusetts_tax(
+    income_sources: Dict[str, float],
+    entity_type: str,
+    tax_year: int = 2024
+) -> Dict[str, float]:
     """
     Calculate Massachusetts state tax with specific rules.
-    MA has 5% flat rate but 12% on short-term capital gains!
+    Uses PolicyEngine's parameter system for accurate, maintained tax rates.
+
+    MA has 5% flat rate on ordinary income and long-term capital gains.
+    STCG rate changed from 12% → 8.5% in 2023 (Bill H.4104 Section 8).
+
+    Reference:
+    - PolicyEngine-US parameter system (authoritative source)
+    - https://malegislature.gov/Bills/193/H4104/BillHistory
     """
-    # MA tax rates
-    ordinary_rate = 0.05  # 5% flat rate
-    stcg_rate = 0.12  # 12% on short-term gains
-    ltcg_rate = 0.05  # 5% on long-term gains
+    # Get MA tax rates directly from PolicyEngine parameter system
+    # This ensures rates are always accurate and automatically updated
+    date_str = f"{tax_year}-01-01"
+
+    ma_params = pe_system.parameters.gov.states.ma.tax.income.rates
+    ordinary_rate = ma_params.part_b(date_str)  # Part B: ordinary income
+    stcg_rate = ma_params.part_a.capital_gains(date_str)  # Part A: STCG
+    ltcg_rate = ma_params.part_c(date_str)  # Part C: LTCG (same as Part B)
     
     # Calculate by income type
     ordinary_income = (
@@ -764,7 +965,8 @@ def calculate_massachusetts_tax(income_sources: Dict[str, float], entity_type: s
         "ltcg_tax": float(ltcg_tax),
         "personal_exemption": float(exemption),
         "total_ma_tax": float(total_ma_tax),
-        "note": "MA charges 12% on STCG vs 5% on other income"
+        "rate_source": "PolicyEngine-US parameter system",
+        "note": f"MA charges {stcg_rate*100}% on STCG vs {ordinary_rate*100}% on other income (rates from PolicyEngine for {tax_year})"
     }
 
 

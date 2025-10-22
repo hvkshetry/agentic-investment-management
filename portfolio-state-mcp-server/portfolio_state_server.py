@@ -218,13 +218,23 @@ class PortfolioStateManager:
         self.state_file = Path(state_path)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         
-        # Optional: Backup existing state if it exists
-        if self.state_file.exists():
+        # Optional: Backup existing state if it exists (controlled by environment variable)
+        if self.state_file.exists() and os.environ.get("PORTFOLIO_STATE_BACKUP", "0") == "1":
             backup_file = self.state_file.parent / f"portfolio_state_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
             shutil.copy(self.state_file, backup_file)
             logger.info(f"Backed up existing state to {backup_file}")
+
+            # Prune old backups - keep only last 5
+            backup_files = sorted(
+                self.state_file.parent.glob("portfolio_state_backup_*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True
+            )
+            for old_backup in backup_files[5:]:  # Keep last 5, delete rest
+                old_backup.unlink()
+                logger.info(f"Pruned old backup: {old_backup}")
         
-        # Initialize empty state (don't load from file)
+        # Initialize empty state first
         self.tax_lots: Dict[str, List[TaxLot]] = {}
         self.positions: Dict[str, Position] = {}
         self.accounts: Dict[str, Dict[str, Any]] = {}
@@ -232,8 +242,15 @@ class PortfolioStateManager:
         self.price_cache: Dict[str, tuple[float, datetime]] = {}  # Cache prices with timestamp
         self.price_cache_ttl = 300  # 5 minutes TTL for price cache
         self.positions_built = False  # Track if positions have been built
-        
-        logger.info("Portfolio state initialized - starting fresh (not loading existing state)")
+
+        # Load existing state if available (CRITICAL FIX - Codex recommendation)
+        self.load_state()
+
+        if self.tax_lots:
+            logger.info(f"Portfolio state loaded from disk: {len(self.tax_lots)} symbols, "
+                       f"{sum(len(lots) for lots in self.tax_lots.values())} tax lots")
+        else:
+            logger.info("Portfolio state initialized - no existing state found, starting fresh")
     
     def load_state(self):
         """Load portfolio state from file without fetching prices"""

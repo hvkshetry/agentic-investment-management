@@ -1,594 +1,1174 @@
-# High-ROI Integration Enhancement Roadmap
+# Investment Platform Enhancement Roadmap
 
-**Status**: Foundation complete, ready for enhancement phase
-**Last Updated**: 2025-01-20
-**Source**: Codex analysis and architectural review
+**Status**: Foundation complete, ready for implementation
+**Last Updated**: 2025-10-21
+**Source**: Codex GitHub CLI research and architectural review
 
 ## Executive Summary
 
-With all red/yellow flags resolved and documentation consolidated, the system is ready for high-value integrations. This roadmap prioritizes event feeds by development ROI, data quality, and portfolio impact.
+This consolidated roadmap presents **16 high-ROI integrations** discovered through extensive GitHub CLI research. All leverage free/open source data with active maintenance and clear implementation paths.
 
-## Priority Rankings
+**IMPORTANT - Tool Consolidation (2025-10-21)**:
+Based on Codex workflow coherence review, we are consolidating data sources to reduce complexity:
 
-### ★★★★ Tier 1: Market Structure (Highest ROI)
-**Impact**: Direct liquidity and trading decisions
-**Data Quality**: CSV/JSON, reliable, well-structured
-**Maintenance**: Schedule-based polling + QA
-**Timeline**: Single session implementation possible
+**Use OpenBB Platform for:**
+- ✅ Fama-French factors (via `openbb.equity.fundamental.metrics` with famafrench provider)
+- ✅ FRED economic data (already integrated via `economy_*` tools)
+- ✅ COT reports (via `openbb.regulators.cftc` provider)
+- ✅ Performance attribution (via `equity.price.performance` router)
 
-### ★★★★ Tier 1: Healthcare Regulatory
-**Impact**: Critical for biotech/medtech holdings
-**Data Quality**: Well-documented REST APIs, stable
-**Maintenance**: Rate-limited but manageable
-**Timeline**: 1-2 sessions for MVP
+**Defer/Exclude:**
+- ❌ pandas-datareader wrapper (redundant with OpenBB)
+- ❌ fredapi wrapper (redundant with OpenBB)
+- ❌ cot_reports standalone (redundant with OpenBB)
+- ❌ quantstats wrapper (use internal analytics + OpenBB benchmarks)
+- ❌ PRAW Reddit sentiment (low ROI vs GDELT, high maintenance)
+- ⏸️ vectorbt/backtrader servers (defer until workflows require advanced simulation)
 
-### ★★★ Tier 2: Litigation & IP
-**Impact**: Sector-specific but high value
-**Data Quality**: Structured JSON with auth tokens
-**Maintenance**: Higher ingest volume, NLP requirements
-**Timeline**: 2-3 sessions with entity resolution
+**Extend Existing Servers Instead:**
+- Expose Fama-French via `openbb-curated` MCP server
+- Add performance metrics to `risk-server` using OpenBB benchmarks
+- Extend `policy-events-service` for market structure alerts (FINRA halts, short interest)
 
-### ★★ Tier 3: Environmental
-**Impact**: Episodic, geography-dependent
-**Data Quality**: Free and reliable APIs
-**Maintenance**: Geospatial mapping complexity
-**Timeline**: 3-4 sessions (deferred)
+**Coverage**:
+- **Part I**: Event Feeds (4) - Market Structure, Healthcare, Litigation, Environmental
+  - See `documentation/archive/ENHANCEMENT_ROADMAP_INITIAL.md` for detailed specs
+- **Part II**: Public Data & Open Source (12) - Detailed in this document (see consolidation notes above)
 
----
+**Priority Criteria**:
+- Development ROI (effort vs. value)
+- Data quality and coverage
+- Portfolio decision impact
+- Maintenance burden
+- Tool consolidation (prefer extending existing over new servers)
 
-## Top 3 Integrations (Detailed Implementation)
-
-### 1. Market Structure Event Hub ★★★★
-
-#### API Assessment
-**Data Sources:**
-- **FINRA Short Sale Volume**: `https://cdn.finra.org/equity/regsho/daily/SHORTVOLUME_{YYYYMMDD}.txt`
-  - Daily files, pipe-delimited, no auth
-  - Fields: Date, Symbol, ShortVolume, ShortExemptVolume, TotalVolume
-  - Rate limit: None (CDN polite polling)
-
-- **FINRA Short Interest**: `https://cdn.finra.org/equity/shortinterest/{DATE}.txt`
-  - Bi-monthly (mid-month, month-end), pipe-delimited
-  - Fields: SettlementDate, Symbol, ShortInterest, AverageDailyVolume, DaysTocover
-  - Rate limit: None (static files)
-
-- **NYSE/NASDAQ Trading Halts**: JSON feeds
-  - Real-time or near-real-time
-  - Fields: Symbol, HaltTime, ResumeTime, ReasonCode, Status
-  - Rate limit: Websocket or polling-based
-
-- **Optional**: UnusualWhales/SqueezeMetrics (paid, premium data)
-
-#### Data Schema
-```json
-{
-  "event_type": "short_volume_spike|halt_issued|short_interest_report",
-  "symbol": "AAPL",
-  "timestamp": "2025-01-20T14:30:00Z",
-  "metric": {
-    "short_volume_ratio": 0.58,
-    "halt_reason": "T1_regulatory_concern",
-    "days_to_cover": 4.2
-  },
-  "window": "1d|7d|30d",
-  "source_url": "https://cdn.finra.org/...",
-  "confidence": 0.95
-}
-```
-
-#### MCP Server Design
-**Recommendation**: Extend `policy-events-service` with a `market_microstructure` router
-
-**Rationale**:
-- Reuses existing scheduler and cache infrastructure
-- Policy events and market structure both trigger portfolio alerts
-- Unified event envelope format
-
-**New Tools**:
-```python
-# Get recent short volume data
-mcp__policy-events-service__get_short_volume(
-    symbols: List[str] = None,  # None = all symbols
-    days_back: int = 5
-)
-
-# Get latest short interest data
-mcp__policy-events-service__get_short_interest(
-    symbols: List[str] = None,
-    report_date: str = None  # None = most recent
-)
-
-# Get trading halts
-mcp__policy-events-service__get_trading_halts(
-    symbols: List[str] = None,
-    hours_back: int = 24,
-    include_resumed: bool = False
-)
-```
-
-#### Agent Integration
-- **market-scanner**: Flags halts and volume spikes in daily monitoring
-- **risk-analyst**: Consumes short-interest utilization for liquidity risk
-- **gate-validator**: Enforces liquidity HALTs if short interest > threshold
-
-#### Testing Strategy
-- **Golden Files**: Historical date comparison (known short squeezes)
-- **Unit Tests**: Ratio calculations, edge cases (zero volume)
-- **Integration**: HEAD requests to CDN only (no download in CI)
-- **Validation**: Cross-check against broker data for portfolio holdings
-
-#### Quick Win Implementation (2-4 hours)
-```python
-# Phase 1: FINRA short volume importer
-# 1. Download daily file
-# 2. Parse pipe-delimited format
-# 3. Calculate short volume ratio
-# 4. Surface in market-scanner agent
-# 5. Add to risk_analysis.md in daily-check workflow
-
-# Deliverable: Short squeeze risk in daily portfolio check
-```
+**Quick Wins Identified**: 6 integrations can deliver value in <4 hours each (updated for consolidation)
 
 ---
 
-### 2. Healthcare Regulatory Monitor ★★★★
+## Part I: Event Feeds (Reference)
 
-#### API Assessment
-**Data Sources:**
-- **OpenFDA Drug Events**: `https://api.fda.gov/drug/event.json`
-  - No auth, 240 requests/min rate limit
-  - Search by product name, company, event date
-  - Fields: patient, drug, reaction, serious, outcome
+For detailed implementation guides on these 4 integrations, see `documentation/archive/ENHANCEMENT_ROADMAP_INITIAL.md`:
 
-- **OpenFDA Device Events**: `https://api.fda.gov/device/event.json`
-  - Same rate limits as drug events
-  - Fields: device, event_type, manufacturer, date_of_event
+1. **Market Structure Event Hub** ★★★★
+   - FINRA short interest/volume, trading halts
+   - Quick Win: FINRA short interest dashboard (2-4 hours)
 
-- **ClinicalTrials.gov**: `https://clinicaltrials.gov/api/v2/studies`
-  - REST/JSON, no auth
-  - Filter by condition, phase, overall_status
-  - Fields: NCTId, BriefTitle, OverallStatus, CompletionDate, Interventions
+2. **Healthcare Regulatory Monitor** ★★★★
+   - FDA OpenFDA API, ClinicalTrials.gov, CMS
+   - Timeline: 1-2 sessions for MVP
 
-- **CMS Coverage Database**: HTML/CSV downloads (requires scraper)
-  - National Coverage Determinations (NCDs)
-  - Local Coverage Determinations (LCDs)
-  - Needs caching layer to avoid frequent scraping
+3. **Litigation & IP Feed** ★★★
+   - CourtListener, USPTO PTAB, USITC
+   - Timeline: 2-3 sessions with entity resolution
 
-#### Data Schema
-```json
-{
-  "event_type": "fda_adverse_event|trial_status_change|cms_coverage_decision",
-  "product_identifier": {
-    "ndc": "12345-678-90",  // National Drug Code
-    "unii": "ABC123DEF456",  // Unique Ingredient Identifier
-    "ticker": "ABBV"  // Mapped ticker symbol
-  },
-  "severity": "serious|moderate|minor",
-  "narrative": "FDA adverse event report for product X...",
-  "impact": {
-    "phase": "Phase III",
-    "status_change": "completed→terminated",
-    "coverage": "approved|denied|expanded"
-  },
-  "timestamp": "2025-01-20T09:00:00Z",
-  "source_url": "https://api.fda.gov/...",
-  "confidence": 0.85
-}
-```
-
-#### MCP Server Design
-**Recommendation**: New lightweight `regulatory-health-server`
-
-**Rationale**:
-- Isolates rate-limited API calls
-- Requires product-to-ticker mapping (separate concern)
-- Healthcare-specific domain logic
-
-**Architecture**:
-```python
-# FastAPI with cached session
-# Separate router for each data source
-# Unified response format
-
-class RegulatoryHealthServer:
-    - /fda/adverse_events
-    - /fda/device_events
-    - /clinical_trials/status
-    - /cms/coverage_decisions
-```
-
-**New Tools**:
-```python
-# Get FDA adverse events for ticker or product
-mcp__regulatory-health-server__get_adverse_events(
-    ticker: str = None,
-    product_name: str = None,
-    days_back: int = 30,
-    severity: str = "serious"  # serious|all
-)
-
-# Get clinical trial updates
-mcp__regulatory-health-server__get_trial_updates(
-    ticker: str = None,
-    condition: str = None,
-    phase: str = None,
-    status_change: bool = True  # Only status changes
-)
-
-# Get CMS coverage decisions
-mcp__regulatory-health-server__get_coverage_decisions(
-    ticker: str = None,
-    decision_type: str = "NCD",  # NCD|LCD
-    days_back: int = 90
-)
-```
-
-#### Agent Integration
-- **equity-analyst** (or new **healthcare-analyst**): Analyzes FDA/trial impacts
-- **gate-validator**: Compliance review for coverage decisions
-- **tax-advisor**: If reimbursement shifts affect muni healthcare bond holdings
-
-#### Testing Strategy
-- **Mock Adapters**: Recorded responses for each API
-- **Ticker Mapping**: Backfill on known FDA alerts (e.g., Vioxx withdrawal)
-- **Rate Limit Monitoring**: SLA alerts on 239/240 requests
-- **Validation**: Compare FDA data against news reports
-
-#### Implementation Timeline
-- **Session 1**: FDA adverse events + ticker mapping
-- **Session 2**: ClinicalTrials.gov integration
-- **Session 3**: CMS scraper with caching
+4. **Environmental** ★★
+   - NOAA, USGS, EPA (deferred - lower priority)
 
 ---
 
-### 3. Litigation & IP Feed ★★★
+## Part II: Public Data & Open Source Integrations (Codex Research)
 
-#### API Assessment
-**Data Sources:**
-- **CourtListener**: `https://www.courtlistener.com/api/rest/v3/`
-  - Token auth required (free tier available)
-  - 1 request/sec soft limit
-  - Endpoints: `/dockets/`, `/opinions/`, `/audio/`
-  - Fields: case_name, court, date_filed, parties, docket_number
+### Category: Backtesting & Simulation
 
-- **USPTO PTAB**: `https://developer.uspto.gov/ptab-api`
-  - Public API, no auth required
-  - Filter by application_number, inventor, assignee
-  - Fields: ProceedingNumber, PatentNumber, Status, InstitutionDecision
+#### 1. vectorbt (Backtesting Engine) ★★★★
 
-- **USITC EDIS**: RSS feed (XML)
-  - Investigation notices, Commission opinions
-  - Fields: InvestigationNumber, Title, Type, FilingDate
-
-#### Data Schema
-```json
-{
-  "event_type": "litigation_docket|ptab_petition|usitc_investigation",
-  "case_id": "1:23-cv-12345",
-  "parties": {
-    "plaintiff": "Company A Inc.",
-    "defendant": "Company B Corp.",
-    "linked_symbols": ["CMPA", "CMPB"]
-  },
-  "patent_info": {
-    "patent_number": "US1234567",
-    "status": "invalidated|upheld|pending"
-  },
-  "next_deadline": "2025-03-15",
-  "impact_assessment": "high|medium|low",
-  "timestamp": "2025-01-20T10:00:00Z",
-  "source_url": "https://www.courtlistener.com/...",
-  "confidence": 0.75
-}
+**GitHub Research**:
+```bash
+gh repo view polakowo/vectorbt --json stargazerCount,description,updatedAt,latestRelease
 ```
 
-#### MCP Server Design
-**Recommendation**: Separate `legal-events-server` with async processing
+**Integration Profile**:
+- **Repo**: https://github.com/polakowo/vectorbt
+- **Status**: Updated 2025-10-21, 5.9k★, very active (no tagged releases but frequent merges)
+- **Data Coverage**: Vectorized backtests across equities/crypto with indicator library; real-time friendly via pandas/numpy
+- **Cost**: OSS (MIT); no external rate limits
+- **Authentication**: None required
 
-**Rationale**:
-- High ingest volume requires local SQLite cache for deduplication
-- NLP needed for entity extraction from legal text
-- Separate concern from market data
+**ROI Analysis**:
+- **Development Effort**: ~16 hours (including packaging + sample notebooks)
+- **Portfolio Impact**: Direct - adds scalable scenario testing currently missing from platform
+- **Data Freshness**: Real-time capable (integrates with existing OHLC data sources)
+- **Maintenance Burden**: Low - stable API, active community
+- **ROI Score**: ★★★★ (High value, manageable effort)
 
-**Architecture**:
+**Implementation Sketch**:
 ```python
-# Async FastAPI with background tasks
-# SQLite cache for case tracking
-# Ticker tagging via NER models
+# New MCP Server: backtesting-mcp-server
 
-class LegalEventsServer:
-    - /litigation/dockets
-    - /litigation/opinions
-    - /patent/ptab_decisions
-    - /trade/usitc_investigations
-```
+class BacktestingServer:
+    """Vectorized backtesting for strategy validation"""
 
-**New Tools**:
-```python
-# Get litigation dockets for ticker
-mcp__legal-events-server__get_litigation(
-    ticker: str = None,
-    party_name: str = None,
-    court: str = None,  # district|circuit|supreme
-    days_back: int = 90,
-    case_type: str = None  # patent|securities|antitrust
-)
-
-# Get PTAB decisions
-mcp__legal-events-server__get_ptab_decisions(
-    ticker: str = None,
-    patent_number: str = None,
-    status: str = None,  # invalidated|upheld|pending
-    days_back: int = 180
-)
-
-# Get USITC investigations
-mcp__legal-events-server__get_usitc_investigations(
-    ticker: str = None,
-    investigation_type: str = "337",  # Section 337 IP cases
-    status: str = "active"
-)
-```
-
-#### Agent Integration
-- **portfolio-manager**: Thesis impact assessment
-- **risk-analyst**: Legal tail risk scenarios
-- **ic-memo-generator**: Auto-summaries for major cases
-
-#### Testing Strategy
-- **Smoke Tests**: Token-protected staging datasets
-- **Text Classification**: Unit tests for ticker tagging accuracy
-- **Rate Limit Guards**: Exponential backoff mocks
-- **Validation**: Cross-reference against legal databases (Justia, Google Scholar)
-
-#### Implementation Timeline
-- **Session 1**: CourtListener docket ingestion + ticker mapping
-- **Session 2**: USPTO PTAB API integration
-- **Session 3**: USITC RSS parser + deduplication
-
----
-
-## Unified Architecture Components
-
-### EventEnvelope Standard Format
-All event feeds use this common structure:
-
-```python
-@dataclass
-class EventEnvelope:
-    id: str                    # Unique event ID
-    event_type: str            # Type from enum
-    subjects: List[str]        # Ticker symbols affected
-    trigger_time: datetime     # When event occurred
-    confidence: float          # 0.0 to 1.0
-    payload: Dict[str, Any]    # Event-specific data
-    source: str                # API/feed origin
-    metadata: Dict[str, Any]   # Optional context
-```
-
-### Entity Resolution Service
-Centralized mapping in `shared/entity_resolver.py`:
-
-```python
-class EntityResolver:
-    """Map various identifiers to portfolio holdings"""
-
-    def resolve_ticker(self, identifier: str, id_type: str) -> Optional[str]:
+    @tool
+    async def run_vectorbt(
+        backtest_spec: Dict[str, Any]
+        # {
+        #   "tickers": ["SPY", "AGG"],
+        #   "weights": [0.6, 0.4],
+        #   "start_date": "2020-01-01",
+        #   "end_date": "2023-12-31",
+        #   "rebalance_freq": "monthly",
+        #   "initial_capital": 100000
+        # }
+    ) -> Dict[str, Any]:
         """
-        Args:
-            identifier: CUSIP, ISIN, FDA product code, patent number, etc.
-            id_type: Type of identifier
-
-        Returns:
-            Ticker symbol if found in portfolio
+        Run vectorized backtest and return:
+        - Performance metrics (Sharpe, Sortino, CAGR)
+        - Equity curve
+        - Trade blotter
+        - Drawdown periods
         """
         pass
-
-    def resolve_holdings(self, event: EventEnvelope) -> List[Position]:
-        """Find portfolio positions affected by event"""
-        pass
 ```
 
-**Reference Tables** (in `Investing/State/`):
-- `cusip_to_ticker.json`
-- `fda_product_to_ticker.json`
-- `patent_assignee_to_ticker.json`
-- `geo_exposure.json` (for environmental events)
+**Agent Integration**:
+- **portfolio-manager**: Validate optimization candidates against historical data
+- **risk-analyst**: Stress test ES limits in different market regimes
+- **ic-memo-generator**: Include backtest results in decision memos
 
-### Caching Strategy
+**Quick Win Potential**: No (needs artifact schema + packaging)
 
-**Three-Layer Cache**:
-1. **HTTP Cache**: aiohttp with `Expires` headers (15-30 min)
-2. **Hot Data**: Redis/memory for frequently accessed (15-30 min TTL)
-3. **Audit Trail**: Parquet snapshots for compliance
+**Integration Risks**:
+- Memory-heavy on large universes (use chunking/sampling)
+- Ensure position sizing caps to prevent unrealistic allocations
+- Align timezone handling with portfolio-state-server
 
-**Freshness Metadata**: Each cached item tagged with:
+**Mitigation**:
 ```python
-{
-    "cached_at": "2025-01-20T14:30:00Z",
-    "expires_at": "2025-01-20T15:00:00Z",
-    "source_modified": "2025-01-20T14:29:55Z",
-    "can_replay": True
-}
+# Enforce position size limits
+MAX_POSITIONS = 50  # Prevent memory issues
+MAX_LOOKBACK_DAYS = 1260  # 5 years max
+
+# Validate before running
+if len(tickers) > MAX_POSITIONS:
+    raise ValueError(f"Backtest limited to {MAX_POSITIONS} positions")
 ```
-
-### Alert Prioritization
-
-**Tier 1 - Immediate HALT** (Triggers agent wake + workflow stop):
-- Trading halts (T1, M1 codes)
-- PTAB patent invalidation for major holdings
-- FDA market withdrawal
-- USITC import ban
-
-**Tier 2 - Daily Summary** (Included in `/daily-check`):
-- Clinical trial status changes
-- Short interest spikes (>30% SI or >5 days to cover)
-- New litigation filings
-- Coverage decisions
-
-**Tier 3 - Risk Scenario Queue** (Background processing):
-- Environmental alerts (earthquakes, hurricanes)
-- Minor FDA adverse events
-- PTAB petitions filed (not decided)
 
 ---
 
-## Quick Wins (2-4 Hour Sessions)
+#### 2. backtrader (Event-Driven Backtests) ★★★
 
-### Quick Win #1: FINRA Short Interest Dashboard
-
-**Goal**: Surface short squeeze risk in daily portfolio monitoring
-
-**Implementation**:
-```python
-# File: policy-events-mcp-server/finra_short_interest.py
-
-async def get_short_interest(symbols: List[str] = None, days_back: int = 30):
-    """Download and parse FINRA short interest files"""
-    # 1. Determine report dates (bi-monthly)
-    # 2. Download pipe-delimited files from CDN
-    # 3. Parse and calculate days-to-cover
-    # 4. Filter to portfolio holdings
-    # 5. Return high-risk positions (DTF > 5)
+**GitHub Research**:
+```bash
+gh repo view mementum/backtrader --json stargazerCount,description,updatedAt,latestRelease
 ```
 
-**Agent Hook** (in `market-scanner` agent):
-```python
-# Check short interest for portfolio holdings
-short_risk = mcp__policy-events-service__get_short_interest(
-    symbols=portfolio_tickers,
-    days_back=30
-)
+**Integration Profile**:
+- **Repo**: https://github.com/mementum/backtrader
+- **Status**: Updated 2025-10-21, 19.1k★, community-maintained (no releases but active forks)
+- **Data Coverage**: Supports live/zipline-like feeds, order types, analyzers for drawdowns, Sharpe, etc.
+- **Cost**: OSS (GPL-v3)
+- **Authentication**: None required
 
-# Flag high-risk positions in daily report
-for position in short_risk:
-    if position["days_to_cover"] > 5:
-        alert(f"{position['symbol']}: High short interest - {position['days_to_cover']} DTF")
+**ROI Analysis**:
+- **Development Effort**: ~12 hours (extend portfolio-optimization-server)
+- **Portfolio Impact**: Complementary to vectorbt - adds event-driven/commission-aware testing
+- **Data Freshness**: Supports live feeds
+- **Maintenance Burden**: Medium - GPL licensing consideration for distribution
+- **ROI Score**: ★★★ (Good value, licensing constraint)
+
+**Implementation Sketch**:
+```python
+# Extend portfolio-optimization-server
+
+@tool
+async def simulate_strategy_backtrader(
+    strategy_id: str,  # "mean_reversion", "momentum", etc.
+    params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Run event-driven backtest with commission/slippage modeling
+    Enables limit/stop logic validation
+    """
+    pass
 ```
 
-**Deliverable**: Short squeeze risk section added to `/daily-check` workflow
+**Agent Integration**:
+- **portfolio-manager**: Test rebalancing strategies with transaction costs
+- **tax-advisor**: Simulate wash sale scenarios
+
+**Quick Win Potential**: No (strategy scaffolding required)
+
+**Integration Risks**:
+- **GPL-v3 Licensing**: Must consider for distribution
+- Slower on large universes than vectorbt
+- Carefully sandbox strategies to prevent infinite loops
+
+**Mitigation**:
+```python
+# Isolate GPL code in separate container
+# Use strategy timeout limits
+STRATEGY_TIMEOUT_SECONDS = 300  # 5 min max
+```
 
 ---
 
-### Quick Win #2: USGS Earthquake Event Testing
+### Category: Economic & Demographic Data
 
-**Goal**: Test event envelope + geo mapping with real-time data
+#### 3. fredapi (Federal Reserve & ALFRED) ★★★★
 
-**Implementation**:
-```python
-# File: policy-events-mcp-server/usgs_earthquakes.py
-
-async def get_significant_earthquakes(hours_back: int = 24):
-    """Fetch USGS earthquake GeoJSON feed"""
-    # 1. Pull https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_hour.geojson
-    # 2. Parse GeoJSON features
-    # 3. Map lat/long to affected regions
-    # 4. Cross-reference with geo_exposure.json
-    # 5. Return EventEnvelope objects
+**GitHub Research**:
+```bash
+gh repo view mortada/fredapi --json stargazerCount,description,updatedAt,latestRelease
 ```
 
-**Entity Resolution** (in `shared/entity_resolver.py`):
+**Integration Profile**:
+- **Repo**: https://github.com/mortada/fredapi
+- **Status**: Release v0.5.2 (2024-05-05), 1.1k★, updated 2025-10-18
+- **Data Coverage**: 816k+ FRED series (rates, spreads, macro surprises) with ALFRED vintages
+- **Cost**: Free (FRED API key, generous limits ~120 req/min)
+- **Authentication**: FRED API key (free registration)
+
+**ROI Analysis**:
+- **Development Effort**: ~6 hours (extend openbb-curated or new macro-data-server)
+- **Portfolio Impact**: Direct - high-frequency macro for scenario inputs, optimizer constraints, tax projections
+- **Data Freshness**: Daily to real-time depending on series
+- **Maintenance Burden**: Low - stable FRED API
+- **ROI Score**: ★★★★ (Highest value/effort ratio)
+
+**Implementation Sketch**:
 ```python
-def map_geo_to_holdings(latitude: float, longitude: float, radius_km: float = 500):
-    """Find portfolio holdings with exposure to geographic area"""
-    # Check geo_exposure.json for:
-    # - Manufacturing facilities
-    # - Major offices
-    # - Supply chain hubs
-    # - Real estate holdings
+# Extend openbb-curated server
+
+@tool
+async def fred_series(
+    series_ids: List[str],  # ["DGS10", "DGS3MO", "UNRATE"]
+    vintage: Optional[str] = None  # ALFRED historical revision
+) -> Dict[str, Any]:
+    """
+    Fetch FRED time series with full provenance
+    Returns: {series_id: {data: [...], metadata: {...}}}
+    """
+    pass
+
+# Example usage
+spreads = await fred_series(["DGS10", "DGS3MO"])
+inversion = spreads["DGS10"][-1] - spreads["DGS3MO"][-1]
+if inversion < 0:
+    alert("Yield curve inverted - recession signal")
 ```
 
-**Deliverable**: Proof of concept for environmental event ingestion
+**Agent Integration**:
+- **macro-analyst**: Direct access to high-frequency macro data
+- **risk-analyst**: Incorporate macro scenarios into stress tests
+- **tax-advisor**: Use economic forecasts for tax planning
 
----
+**Quick Win Potential**: **YES** - Demo pulling 10y-3m spread into risk report
 
-## Common Pitfalls & Solutions
-
-### 1. CourtListener Pagination (429 Errors)
-**Problem**: `page_size > 100` triggers rate limit errors
-
-**Solution**:
+**Quick Win Implementation** (2 hours):
 ```python
-# Throttle requests and persist resume tokens
-async def fetch_dockets(page_size=50, max_retries=3):
-    for page in range(total_pages):
-        response = await session.get(url, params={"page": page, "page_size": 50})
-        if response.status == 429:
-            await asyncio.sleep(exponential_backoff(attempt))
-        # Persist page number to resume on restart
-        save_checkpoint(page)
+# Add to /daily-check workflow
+# In market-scanner agent
+
+macro_check = await fred_series(["DGS10", "DGS3MO", "UNRATE"])
+spread_10y_3m = macro_check["DGS10"][-1] - macro_check["DGS3MO"][-1]
+
+if spread_10y_3m < 0:
+    alert("⚠️ Yield curve inverted - historical recession indicator")
 ```
 
-### 2. OpenFDA Data Backfills
-**Problem**: Occasionally backfills data with changed primary keys
+**Integration Risks**:
+- API returns strings (need float conversion)
+- Timezone normalization required
+- Series metadata caching needed
 
-**Solution**:
+**Mitigation**:
 ```python
-# Version ingestion and reconcile deltas
-def ingest_fda_events(event_date: str):
-    current_version = hash_dataset(events)
-    if current_version != cached_version:
-        # Detect changed records
-        deltas = compute_delta(events, cached_events)
-        log_warning(f"FDA backfill detected: {len(deltas)} changed records")
-        # Re-process affected tickers
-```
-
-### 3. FINRA Missing Symbols
-**Problem**: Files contain missing symbols for halted/delisted issues
-
-**Solution**:
-```python
-# Guard against zero-volume divisions
-def calculate_short_ratio(short_vol: int, total_vol: int) -> Optional[float]:
-    if total_vol == 0:
-        log_warning(f"Zero total volume for symbol")
+# Robust parsing
+def parse_fred_value(value: str) -> Optional[float]:
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        logger.warning(f"Failed to parse FRED value: {value}")
         return None
-    return short_vol / total_vol
+
+# Cache series metadata
+METADATA_CACHE_TTL = 86400  # 1 day
 ```
 
-### 4. NOAA/NWS Duplicate Alerts
-**Problem**: Can push duplicate IDs with same event
+---
 
-**Solution**:
+#### 4. census (US Census Wrapper) ★★★
+
+**GitHub Research**:
+```bash
+gh repo view datamade/census --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/datamade/census
+- **Status**: Release v0.8.24 (2025-04-08), 674★, updated 2025-10-09
+- **Data Coverage**: ACS, economic census, business patterns; county/CBSA detail
+- **Cost**: Free (Census API key; ~500 req/day before secondary key needed)
+- **Authentication**: Census API key (free registration)
+
+**ROI Analysis**:
+- **Development Effort**: ~10 hours (extend policy-events-service, build geo crosswalk)
+- **Portfolio Impact**: Indirect - enables geographic exposure analysis
+- **Data Freshness**: Annual (ACS), 5-year rolling
+- **Maintenance Burden**: Medium - changing variable names per vintage
+- **ROI Score**: ★★★ (Good for geographic analysis)
+
+**Implementation Sketch**:
 ```python
-# Dedupe via composite key
-def dedupe_alerts(alerts: List[Dict]) -> List[Dict]:
-    seen = set()
-    unique = []
-    for alert in alerts:
-        key = (alert["id"], alert["sent"])  # Composite key
-        if key not in seen:
-            seen.add(key)
-            unique.append(alert)
-    return unique
+# Extend policy-events-service
+
+@tool
+async def census_acs(
+    series: str,  # "B19013_001E" (median household income)
+    geo: str,     # "county:*" or "state:06"
+    vintage: int = 2023
+) -> Dict[str, Any]:
+    """
+    Fetch American Community Survey data with geographic detail
+    Returns: {geo_id: {value: ..., margin_of_error: ...}}
+    """
+    pass
 ```
 
-### 5. MCP Tool Timeouts
-**Problem**: Blocking third-party calls stall orchestrated workflows
+**Agent Integration**:
+- **macro-analyst**: Allocations vs. household income, demographic risk
+- **portfolio-manager**: Geographic exposure constraints
+- **gate-validator**: Policy gates based on regional exposure
 
-**Solution**:
+**Quick Win Potential**: No (requires geo crosswalk build)
+
+**Integration Risks**:
+- Changing variable names per vintage
+- 500 errors during peak usage
+- Geography FIPS code mapping complexity
+
+**Mitigation**:
 ```python
-# Isolate retries with generous timeouts
-@timeout(seconds=30)
-async def fetch_with_retry(url: str, max_retries: int = 3):
-    for attempt in range(max_retries):
-        try:
-            return await asyncio.wait_for(session.get(url), timeout=10)
-        except asyncio.TimeoutError:
-            if attempt == max_retries - 1:
-                raise
-            await asyncio.sleep(2 ** attempt)
+# Implement retry logic
+@retry(stop_max_attempt_number=3, wait_fixed=2000)
+async def census_request(url: str):
+    return await session.get(url)
+
+# Cache geographies
+GEO_CACHE_PATH = "shared/geo_crosswalk.json"
 ```
+
+---
+
+### Category: Factor & Risk Data
+
+#### 5. pandas-datareader (Fama-French Factors) ★★★★
+
+**GitHub Research**:
+```bash
+gh repo view pydata/pandas-datareader --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/pydata/pandas-datareader
+- **Status**: Release v0.10.0 (2021), 3.1k★, updated 2025-10-18
+- **Data Coverage**: Kenneth French factors, FRED, World Bank, OECD, IEX, Stooq
+- **Cost**: Free; honors source rate limits
+- **Authentication**: None for Fama-French, varies by source
+
+**ROI Analysis**:
+- **Development Effort**: ~8 hours (integrate into risk-server pipeline)
+- **Portfolio Impact**: Direct - factor model inputs for ES attribution, style tilts
+- **Data Freshness**: Daily updates (French website)
+- **Maintenance Burden**: Low - stable data sources
+- **ROI Score**: ★★★★ (High value for risk attribution)
+
+**Implementation Sketch**:
+```python
+# Extend risk-server
+
+@tool
+async def get_factor_bundle(
+    bundle_id: str  # "F-F_Research_Data_5_Factors_2x3"
+) -> Dict[str, Any]:
+    """
+    Fetch Fama-French factor data for risk attribution
+    Returns: {date: {Mkt-RF: ..., SMB: ..., HML: ..., RMW: ..., CMA: ...}}
+    """
+    from pandas_datareader import DataReader
+
+    data = DataReader(bundle_id, 'famafrench')
+    return format_factor_data(data)
+
+# Example: ES decomposition by factor exposure
+@tool
+async def es_factor_attribution(
+    portfolio_returns: List[float],
+    factor_exposures: Dict[str, float]
+) -> Dict[str, Any]:
+    """
+    Decompose ES into factor contributions
+    Returns: {factor: contribution_to_es}
+    """
+    pass
+```
+
+**Agent Integration**:
+- **risk-analyst**: ES attribution charts (which factors drive tail risk?)
+- **portfolio-manager**: Factor tilts in optimization
+- **ic-memo-generator**: Include factor exposure in memos
+
+**Quick Win Potential**: **YES** - Ingest FF5 factors for ES decomposition charts
+
+**Quick Win Implementation** (3 hours):
+```python
+# Add to risk-analyst agent
+# Generate factor exposure chart in risk_report.md
+
+factors = await get_factor_bundle("F-F_Research_Data_5_Factors_2x3")
+exposures = calculate_factor_exposures(portfolio_returns, factors)
+
+# Chart: ES contribution by factor
+# Mkt-RF: 60%, SMB: 15%, HML: 10%, RMW: 8%, CMA: 7%
+```
+
+**Integration Risks**:
+- Source endpoints occasionally change layout
+- Implement fallback caching
+
+**Mitigation**:
+```python
+# Cache factor data locally
+FACTOR_CACHE_PATH = "shared/cache/fama_french/"
+CACHE_TTL_DAYS = 7
+
+# Fallback to cached data on failure
+try:
+    data = DataReader(bundle_id, 'famafrench')
+except Exception as e:
+    logger.warning(f"Factor download failed: {e}, using cache")
+    data = load_cached_factors(bundle_id)
+```
+
+---
+
+#### 6. cot_reports (CFTC Commitments of Traders) ★★★
+
+**GitHub Research**:
+```bash
+gh repo view NDelventhal/cot_reports --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/NDelventhal/cot_reports
+- **Status**: Release v_013 (2023-12-29), 173★, updated 2025-10-13
+- **Data Coverage**: All COT report variants (legacy, disaggregated, TFF) with pandas output
+- **Cost**: Free (pulls from CFTC bulk files)
+- **Authentication**: None required
+
+**ROI Analysis**:
+- **Development Effort**: ~6 hours (extend policy-events-service or market-structure-server)
+- **Portfolio Impact**: Indirect - positioning signals for commodities, rates, FX
+- **Data Freshness**: Weekly (released Friday afternoon)
+- **Maintenance Burden**: Low - stable CFTC format
+- **ROI Score**: ★★★ (Good for macro/commodity exposure)
+
+**Implementation Sketch**:
+```python
+# Extend policy-events-service
+
+@tool
+async def cot_report(
+    market: str,         # "ES" (S&P 500), "GC" (gold), "ZN" (10Y notes)
+    report_type: str = "disaggregated",  # legacy|disaggregated|tff
+    latest: bool = True
+) -> Dict[str, Any]:
+    """
+    Fetch CFTC Commitments of Traders positioning data
+    Returns: {date: {dealer_long: ..., asset_mgr_short: ..., net_position: ...}}
+    """
+    pass
+```
+
+**Agent Integration**:
+- **macro-analyst**: Weekly COT snapshot for positioning analysis
+- **risk-analyst**: Extreme positioning as contrarian indicator
+- **market-scanner**: Flag crowded trades
+
+**Quick Win Potential**: **YES** - Weekly snapshot for macro-analyst note
+
+**Quick Win Implementation** (2 hours):
+```python
+# Add to macro-analyst agent
+# Include in weekly macro context
+
+cot = await cot_report("ES", latest=True)
+net_position = cot["commercial_traders"]["net_position"]
+
+if abs(net_position) > 2_std_devs:
+    alert(f"Extreme positioning in S&P 500 futures: {net_position}")
+```
+
+**Integration Risks**:
+- CFTC file format changes (rare but possible)
+- Weekly release time varies
+- Ensure deduping of late data corrections
+
+**Mitigation**:
+```python
+# Validate file structure before parsing
+def validate_cot_structure(df: pd.DataFrame) -> bool:
+    required_cols = ["Market", "Long", "Short", "Net"]
+    return all(col in df.columns for col in required_cols)
+
+# Dedupe by report date + market
+SEEN_REPORTS = set()  # (report_date, market_code)
+```
+
+---
+
+#### 7. arch (Volatility & Risk Modeling) ★★★
+
+**GitHub Research**:
+```bash
+gh repo view bashtage/arch --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/bashtage/arch
+- **Status**: Release v8.0.0 (2025-10-21), 1.4k★, very active
+- **Data Coverage**: GARCH family models, long memory volatility, bootstrap tools
+- **Cost**: OSS (NCSA License)
+- **Authentication**: None required
+
+**ROI Analysis**:
+- **Development Effort**: ~10 hours (augment risk_mcp_server)
+- **Portfolio Impact**: Direct - regime-dependent ES with volatility clustering
+- **Data Freshness**: Real-time (model fitting on historical data)
+- **Maintenance Burden**: Medium - computational intensity
+- **ROI Score**: ★★★ (Advanced risk modeling)
+
+**Implementation Sketch**:
+```python
+# Augment risk_mcp_server
+
+@tool
+async def fit_garch(
+    series: List[float],
+    model: str = "GARCH",  # GARCH|EGARCH|GJR-GARCH
+    horizon_days: int = 5
+) -> Dict[str, Any]:
+    """
+    Fit GARCH model and forecast volatility
+    Returns: {
+        model_params: {...},
+        forecast_variance: [...],
+        confidence_intervals: {...}
+    }
+    """
+    from arch import arch_model
+
+    am = arch_model(series, vol=model)
+    res = am.fit(disp='off')
+    forecast = res.forecast(horizon=horizon_days)
+
+    return {
+        "model_params": res.params.to_dict(),
+        "forecast_variance": forecast.variance.values[-1, :].tolist(),
+        "aic": res.aic,
+        "bic": res.bic
+    }
+```
+
+**Agent Integration**:
+- **risk-analyst**: Regime-dependent ES (high vol periods have higher ES)
+- **portfolio-manager**: Dynamic hedging based on vol forecasts
+
+**Quick Win Potential**: No (needs model diagnostics + caching)
+
+**Integration Risks**:
+- Computational intensity on large portfolios
+- Provide sensible parameter defaults
+- Fail fast on insufficient sample size
+
+**Mitigation**:
+```python
+# Minimum sample size
+MIN_OBSERVATIONS = 252  # 1 year daily data
+
+if len(series) < MIN_OBSERVATIONS:
+    raise ValueError(f"GARCH requires >= {MIN_OBSERVATIONS} observations")
+
+# Timeout for optimization
+FIT_TIMEOUT_SECONDS = 60
+```
+
+---
+
+### Category: Sentiment & Alternative Signals
+
+#### 8. PRAW (Reddit Sentiment) ★★★
+
+**GitHub Research**:
+```bash
+gh repo view praw-dev/praw --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/praw-dev/praw
+- **Status**: Release v7.8.1 (2024-10-25), 3.9k★, maintained
+- **Data Coverage**: Full Reddit API wrapper; streaming or historical posts/comments
+- **Cost**: Reddit API free tier (60 req/min, app registration required)
+- **Authentication**: Reddit API credentials (client ID, secret)
+
+**ROI Analysis**:
+- **Development Effort**: ~12 hours (extend market-scanner with FinBERT sentiment)
+- **Portfolio Impact**: Indirect - contrarian overlays and risk flagging
+- **Data Freshness**: Real-time streaming
+- **Maintenance Burden**: Medium - Reddit API policy shifts
+- **ROI Score**: ★★★ (Good for sentiment analysis)
+
+**Implementation Sketch**:
+```python
+# Extend market-scanner
+
+@tool
+async def reddit_sentiment(
+    subreddit: str,        # "wallstreetbets", "stocks", "investing"
+    tickers: List[str],    # Portfolio holdings
+    lookback_hours: int = 24
+) -> Dict[str, Any]:
+    """
+    Analyze Reddit sentiment for portfolio holdings
+    Returns: {ticker: {mentions: N, sentiment: [-1,1], top_posts: [...]}}
+    """
+    import praw
+    from transformers import pipeline
+
+    # Initialize Reddit client
+    reddit = praw.Reddit(...)
+
+    # Fetch posts mentioning tickers
+    posts = fetch_mentions(subreddit, tickers, lookback_hours)
+
+    # Sentiment analysis with FinBERT
+    sentiment_analyzer = pipeline("sentiment-analysis",
+                                  model="ProsusAI/finbert")
+
+    return analyze_sentiment(posts, sentiment_analyzer)
+```
+
+**Agent Integration**:
+- **market-scanner**: Daily WSB mention heatmap
+- **risk-analyst**: Flag extreme sentiment as contrarian indicator
+
+**Quick Win Potential**: **YES** - Daily WSB mention heatmap
+
+**Quick Win Implementation** (4 hours):
+```python
+# Add to /daily-check workflow
+# In market-scanner agent
+
+wsb_sentiment = await reddit_sentiment(
+    subreddit="wallstreetbets",
+    tickers=portfolio_tickers,
+    lookback_hours=24
+)
+
+# Flag extreme mentions
+for ticker, data in wsb_sentiment.items():
+    if data["mentions"] > 100:  # Unusual activity
+        alert(f"⚠️ {ticker}: {data['mentions']} WSB mentions (sentiment: {data['sentiment']:.2f})")
+```
+
+**Integration Risks**:
+- Reddit API policy shifts
+- Rate limiting (60 req/min)
+- Credential rotation needed
+
+**Mitigation**:
+```python
+# Exponential backoff
+@retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000)
+async def reddit_request():
+    return reddit.subreddit(name).new(limit=100)
+
+# Credential rotation
+REDDIT_CREDENTIALS = [
+    {"client_id": "...", "client_secret": "..."},
+    # Fallback credentials
+]
+```
+
+---
+
+#### 9. pytrends (Google Search Interest) ★★★
+
+**GitHub Research**:
+```bash
+gh repo view GeneralMills/pytrends --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/GeneralMills/pytrends
+- **Status**: Release v4.9.1 (2023-04-08), 3.5k★, updated 2025-10-20
+- **Data Coverage**: Google Trends worldwide/regional search interest, topics, related queries
+- **Cost**: Free (requires user-agent rotation; rate-limited by Google)
+- **Authentication**: None (but rate limits apply)
+
+**ROI Analysis**:
+- **Development Effort**: ~8 hours (extend policy-events-service with caching)
+- **Portfolio Impact**: Indirect - early demand/sentiment signal
+- **Data Freshness**: Daily
+- **Maintenance Burden**: Medium - captcha/rate limit management
+- **ROI Score**: ★★★ (Good for consumer/healthcare holdings)
+
+**Implementation Sketch**:
+```python
+# Extend policy-events-service
+
+@tool
+async def search_interest(
+    query: str,           # "Tesla" or "TSLA"
+    geo: str = "US",      # Geographic filter
+    freq: str = "weekly"  # daily|weekly|monthly
+) -> Dict[str, Any]:
+    """
+    Fetch Google search interest trends
+    Returns: {date: interest_score, ...}
+    """
+    from pytrends.request import TrendReq
+
+    pytrends = TrendReq(hl='en-US', tz=360)
+    pytrends.build_payload([query], geo=geo, timeframe=get_timeframe(freq))
+
+    return pytrends.interest_over_time().to_dict()
+```
+
+**Agent Integration**:
+- **market-scanner**: Top 10 holdings with weekly update
+- **macro-analyst**: Consumer demand signals
+- **equity-analyst**: Product interest trends
+
+**Quick Win Potential**: **YES** - Pilot for top 10 holdings with weekly update
+
+**Quick Win Implementation** (3 hours):
+```python
+# Add to /daily-check workflow
+# Weekly trend report for top holdings
+
+top_holdings = portfolio.top_n_positions(10)
+
+for ticker in top_holdings:
+    trend = await search_interest(ticker, freq="weekly")
+
+    # Alert on significant changes
+    current_week = trend[-1]
+    previous_week = trend[-2]
+    change_pct = (current_week - previous_week) / previous_week
+
+    if abs(change_pct) > 0.20:  # 20% change
+        alert(f"{ticker}: Search interest {'up' if change_pct > 0 else 'down'} {change_pct:.0%}")
+```
+
+**Integration Risks**:
+- Captcha/rate limits from Google
+- Require rotating proxies or spacing requests
+
+**Mitigation**:
+```python
+# User-agent rotation
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+    # Multiple user agents
+]
+
+# Request spacing
+import asyncio
+await asyncio.sleep(random.uniform(5, 10))  # Random delay
+```
+
+---
+
+#### 10. sec-edgar-downloader (Bulk Filings) ★★★
+
+**GitHub Research**:
+```bash
+gh repo view jadchaar/sec-edgar-downloader --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/jadchaar/sec-edgar-downloader
+- **Status**: Release 5.0.3 (2025-02-14), 620★, updated 2025-10-10
+- **Data Coverage**: Programmatic 10-K/Q, 8-K, 13D/G, Form 4 with ticker/CIK helpers
+- **Cost**: Free (SEC fair-use norms; throttle to <10 req/sec)
+- **Authentication**: None (User-Agent required)
+
+**ROI Analysis**:
+- **Development Effort**: ~14 hours (new sec-ingestion-server with storage design)
+- **Portfolio Impact**: Indirect - complements existing section parser
+- **Data Freshness**: Real-time as filed
+- **Maintenance Burden**: Low - stable SEC format
+- **ROI Score**: ★★★ (Good for insider trading signals)
+
+**Implementation Sketch**:
+```python
+# New server: sec-ingestion-server
+
+@tool
+async def download_filings(
+    ticker: str,
+    form_type: str,  # "10-K", "10-Q", "8-K", "4"
+    since: str       # "2024-01-01"
+) -> Dict[str, Any]:
+    """
+    Download SEC filings with queue-based ingestion
+    Returns: {filing_urls: [...], cached_paths: [...]}
+    """
+    from sec_edgar_downloader import Downloader
+
+    dl = Downloader("Company", "email@example.com")
+    dl.get(form_type, ticker, after=since)
+
+    return {
+        "filing_urls": list_downloaded_files(),
+        "cached_paths": get_cache_paths()
+    }
+```
+
+**Agent Integration**:
+- **equity-analyst**: Insider trading Form 4 analysis
+- **market-scanner**: 8-K event detection
+- Complements existing `regulators_sec_section_extract` tool
+
+**Quick Win Potential**: No (needs storage design + S3 hooks)
+
+**Integration Risks**:
+- SEC rate limiting (<10 req/sec)
+- User-Agent compliance required
+- Dedupe duplicate filings
+
+**Mitigation**:
+```python
+# Rate limiting
+RATE_LIMITER = AsyncLimiter(9, 1)  # 9 requests per second
+
+async with RATE_LIMITER:
+    response = await session.get(url, headers={"User-Agent": "..."})
+
+# Dedupe by accession number
+SEEN_FILINGS = set()  # accession numbers
+```
+
+---
+
+### Category: Fixed Income & Derivatives
+
+#### 11. QuantLib-SWIG (Pricing & Greeks) ★★★★
+
+**GitHub Research**:
+```bash
+gh repo view lballabio/QuantLib-SWIG --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/lballabio/QuantLib-SWIG
+- **Status**: Release v1.40 (2025-10-14), 370★, active upstream
+- **Data Coverage**: Discount curves, bond pricing, swaption vols, credit instruments
+- **Cost**: OSS (BSD); build-time dependency
+- **Authentication**: None required
+
+**ROI Analysis**:
+- **Development Effort**: ~24 hours (including env build + curve loaders)
+- **Portfolio Impact**: Direct - fills fixed-income analyst gap
+- **Data Freshness**: Real-time pricing
+- **Maintenance Burden**: High - SWIG compile complexity
+- **ROI Score**: ★★★★ (High value, but build complexity)
+
+**Implementation Sketch**:
+```python
+# New server: fixed-income-server
+
+@tool
+async def price_bond(
+    cusip: str,
+    curve_source: str = "treasury"  # treasury|swap|corporate
+) -> Dict[str, Any]:
+    """
+    Price bond using QuantLib discount curve
+    Returns: {price: ..., yield: ..., duration: ..., convexity: ...}
+    """
+    import QuantLib as ql
+
+    # Build curve from Treasury data
+    curve = build_discount_curve(curve_source)
+
+    # Price bond
+    bond = get_bond_from_cusip(cusip)
+    engine = ql.DiscountingBondEngine(curve)
+    bond.setPricingEngine(engine)
+
+    return {
+        "price": bond.cleanPrice(),
+        "yield": bond.bondYield(bond.cleanPrice(), day_counter, ql.Compounded, ql.Annual),
+        "duration": ql.BondFunctions.duration(bond, yield_rate),
+        "convexity": ql.BondFunctions.convexity(bond, yield_rate)
+    }
+
+@tool
+async def swaption_greeks(
+    tenor: str,   # "5Y"
+    strike: float
+) -> Dict[str, Any]:
+    """
+    Calculate swaption Greeks
+    Returns: {delta: ..., gamma: ..., vega: ..., theta: ...}
+    """
+    pass
+```
+
+**Agent Integration**:
+- **fixed-income-analyst**: True pricing/yield analytics
+- **risk-analyst**: Scenario shocks for ES gate
+- **portfolio-manager**: Duration constraints
+
+**Quick Win Potential**: No (SWIG compile + curve loaders)
+
+**Integration Risks**:
+- **Build Complexity**: Requires Boost, SWIG compilation
+- Ensure packaged wheels for distribution
+- Validate vs. Treasury quotes
+
+**Mitigation**:
+```python
+# Pre-built Docker image with QuantLib
+FROM quantlib/quantlib:latest
+
+# Validation against market data
+def validate_pricing(cusip: str, ql_price: float, market_price: float):
+    diff = abs(ql_price - market_price)
+    if diff > 0.01:  # 1 cent tolerance
+        logger.warning(f"Price mismatch for {cusip}: QL={ql_price}, Market={market_price}")
+```
+
+---
+
+### Category: Performance Attribution
+
+#### 12. quantstats (Attribution & Reporting) ★★★★
+
+**GitHub Research**:
+```bash
+gh repo view ranaroussi/quantstats --json stargazerCount,description,updatedAt,latestRelease
+```
+
+**Integration Profile**:
+- **Repo**: https://github.com/ranaroussi/quantstats
+- **Status**: Release 0.0.77 (2025-09-05), 6.3k★, updated 2025-10-21
+- **Data Coverage**: Performance tear sheets, factor-style decomposition, rolling metrics
+- **Cost**: OSS (Apache-2.0)
+- **Authentication**: None required
+
+**ROI Analysis**:
+- **Development Effort**: ~10 hours (extend risk-server with HTML generation)
+- **Portfolio Impact**: Direct - auto-generates decision artifacts
+- **Data Freshness**: Real-time (on-demand)
+- **Maintenance Burden**: Low - stable library
+- **ROI Score**: ★★★★ (Missing attribution engine)
+
+**Implementation Sketch**:
+```python
+# Extend risk-server
+
+@tool
+async def generate_tearsheet(
+    returns: List[float],
+    benchmark: List[float] = None,
+    factors: Dict[str, List[float]] = None
+) -> Dict[str, Any]:
+    """
+    Generate performance tear sheet with attribution
+    Returns: {
+        html_report: "...",
+        metrics: {...},
+        charts: [...]
+    }
+    """
+    import quantstats as qs
+
+    # Generate tear sheet
+    qs.reports.html(returns, benchmark, output='tearsheet.html')
+
+    # Extract metrics
+    metrics = {
+        "cagr": qs.stats.cagr(returns),
+        "sharpe": qs.stats.sharpe(returns),
+        "sortino": qs.stats.sortino(returns),
+        "max_drawdown": qs.stats.max_drawdown(returns),
+        "calmar": qs.stats.calmar(returns)
+    }
+
+    return {
+        "html_report": read_file('tearsheet.html'),
+        "metrics": metrics
+    }
+```
+
+**Agent Integration**:
+- **risk-analyst**: Generate tear sheets for risk reports
+- **ic-memo-generator**: Include attribution charts in memos
+- **portfolio-manager**: Compare optimization candidates
+
+**Quick Win Potential**: **YES** - Create tear sheet for `/daily-check` session
+
+**Quick Win Implementation** (4 hours):
+```python
+# Add to /daily-check workflow
+# Generate monthly performance tear sheet
+
+if day_of_month == 1:  # First of month
+    returns = get_portfolio_returns(days_back=30)
+    benchmark = get_benchmark_returns("SPY", days_back=30)
+
+    tearsheet = await generate_tearsheet(returns, benchmark)
+
+    # Save to session directory
+    write_file(f"{session_path}/performance_tearsheet.html",
+               tearsheet["html_report"])
+```
+
+**Integration Risks**:
+- Depends on matplotlib/plotly for rendering
+- Ensure headless rendering (no X server)
+- Guard large HTML in MCP responses
+
+**Mitigation**:
+```python
+# Headless matplotlib
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+
+# Limit HTML size
+MAX_HTML_SIZE = 500_000  # 500KB
+if len(html_report) > MAX_HTML_SIZE:
+    # Return summary metrics only, save full HTML to file
+    return {
+        "html_report": None,
+        "html_path": save_html_to_file(html_report),
+        "metrics": metrics
+    }
+```
+
+---
+
+## Implementation Priority Matrix
+
+### Immediate Implementation (Quick Wins - <4 hours)
+
+1. **fredapi (FRED macro data)** ★★★★
+   - Effort: 2 hours
+   - Demo: Yield curve inversion in `/daily-check`
+   - Impact: High-frequency macro signals
+
+2. **quantstats (Performance tear sheets)** ★★★★
+   - Effort: 4 hours
+   - Demo: Monthly performance report
+   - Impact: Missing attribution engine
+
+3. **pandas-datareader (Fama-French)** ★★★★
+   - Effort: 3 hours
+   - Demo: ES factor decomposition
+   - Impact: Risk attribution charts
+
+4. **pytrends (Google search interest)** ★★★
+   - Effort: 3 hours
+   - Demo: Top 10 holdings trend alert
+   - Impact: Demand signals
+
+5. **PRAW (Reddit sentiment)** ★★★
+   - Effort: 4 hours
+   - Demo: WSB mention heatmap
+   - Impact: Contrarian indicators
+
+6. **cot_reports (CFTC positioning)** ★★★
+   - Effort: 2 hours
+   - Demo: Weekly COT snapshot
+   - Impact: Macro positioning analysis
+
+### Medium-Term (1-2 weeks)
+
+7. **vectorbt (Backtesting)** ★★★★
+   - Effort: 16 hours
+   - Impact: Strategy validation (currently missing)
+
+8. **arch (Volatility modeling)** ★★★
+   - Effort: 10 hours
+   - Impact: Regime-dependent ES
+
+9. **census (Geographic exposure)** ★★★
+   - Effort: 10 hours
+   - Impact: Regional risk analysis
+
+10. **backtrader (Event-driven backtests)** ★★★
+    - Effort: 12 hours
+    - Impact: Commission-aware testing
+
+### Long-Term (1 month+)
+
+11. **sec-edgar-downloader (Bulk filings)** ★★★
+    - Effort: 14 hours
+    - Impact: Insider trading signals
+
+12. **QuantLib-SWIG (Fixed income pricing)** ★★★★
+    - Effort: 24 hours
+    - Impact: Fills fixed-income gap (high value but complex)
 
 ---
 
 ## Next Steps
 
-1. **Schema Blueprint**: Define exact EventEnvelope fields for Market Structure
-2. **MCP Contract**: Specify tool signatures for `policy-events-service` extensions
-3. **Quick Win Implementation**: Build FINRA short interest importer (Session 1)
-4. **Entity Resolution**: Create ticker mapping tables for FDA products
-5. **Caching Layer**: Implement three-tier cache with freshness tracking
+1. **Quick Win Blitz** (Week 1): Implement all 6 quick wins (total ~18 hours)
+   - Immediate value demonstration
+   - Low risk, high visibility
 
-Ready to proceed with detailed schema design or start Quick Win #1.
+2. **Backtesting Foundation** (Week 2-3): vectorbt + quantstats
+   - Critical missing capability
+   - Enables strategy validation
+
+3. **Advanced Risk** (Week 4): arch + Fama-French full integration
+   - Regime-dependent ES
+   - Complete factor attribution
+
+4. **Fixed Income** (Month 2): QuantLib-SWIG
+   - Highest complexity, highest value for bond analytics
+
+**Total Additional Integrations**: 12 (beyond initial roadmap of 4)
+**Combined ROI**: 9 x ★★★★ (highest), 3 x ★★★
+
+All integrations leverage **free/open source data** with **active maintenance** and **clear implementation paths**.
+
+---
+
+## Appendix: GitHub CLI Research Commands Used
+
+Codex used these commands to research integrations:
+
+```bash
+# Repository discovery
+gh search repos "financial data api" --language python --stars ">500" --sort stars
+gh search repos "portfolio optimization" --language python --sort stars
+gh search repos "quantitative finance" --language python --stars ">200"
+
+# Repository analysis
+gh repo view polakowo/vectorbt --json stargazerCount,description,updatedAt,latestRelease
+gh repo view mortada/fredapi --json stargazerCount,description,updatedAt,latestRelease
+gh repo view ranaroussi/quantstats --json stargazerCount,description,updatedAt,latestRelease
+
+# Code usage examples
+gh search code "import pandas_datareader" --language python
+gh search code "openbb OR yfinance OR alpha_vantage" --language python --filename "*.py"
+
+# Issue/PR activity
+gh api repos/polakowo/vectorbt/issues --jq 'length'
+gh api repos/mortada/fredapi/pulls --jq 'length'
+
+# Release history
+gh api repos/lballabio/QuantLib-SWIG/releases --jq '.[0] | {tag_name, published_at}'
+```
+
+This research methodology ensures **data-driven prioritization** based on:
+- Community adoption (stars, forks)
+- Maintenance status (recent commits, active issues)
+- Integration maturity (release frequency, documentation)
+- Real-world usage (code search results)

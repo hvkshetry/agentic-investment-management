@@ -885,16 +885,18 @@ async def analyze_portfolio_risk(
             "risk_level": "HIGH" if annual_vol > 0.20 else "MODERATE" if annual_vol > 0.10 else "LOW",
             "es_975_1day": es_975_value,  # PRIMARY RISK METRIC
             "es_limit": es_limit,  # BINDING CONSTRAINT
-            "halt_required": halt_required,  # HALT if True
-            "es_status": "⚠️ BREACH - HALT TRADING" if halt_required else "✅ Within Limits",
+            "halt_required": halt_required,  # TRUE if ES breached (advisory system - no trading authority)
+            "risk_alert_level": 3 if halt_required else 0,  # 3 = CRITICAL (trading strongly discouraged)
+            "es_status": "🔴 CRITICAL ALERT - Trading Strongly Discouraged" if halt_required else "✅ Within Limits",
             "key_risks": [],
             "recommendations": []
         }
-        
+
         # Generate key risks (ES BREACH FIRST - MOST CRITICAL)
         if halt_required:
             result["executive_summary"]["key_risks"].append(
-                f"⚠️ HALT REQUIRED: ES @ 97.5% = {es_975_value:.2%} exceeds limit of {es_limit:.2%}"
+                f"🔴 RISK ALERT LEVEL 3 - CRITICAL: ES @ 97.5% = {es_975_value:.2%} exceeds limit of {es_limit:.2%}. "
+                f"URGENT REVIEW REQUIRED. Do not execute new trades until ES drops below {es_limit:.2%}."
             )
         if max_drawdown < -0.20:
             result["executive_summary"]["key_risks"].append(f"High drawdown risk: {max_drawdown:.1%}")
